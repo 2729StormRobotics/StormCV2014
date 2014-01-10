@@ -51,6 +51,8 @@ extends WPILaptopCameraExtension {
         doNothing,threshold,contours,everything
     }
     
+    public DoubleProperty  cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47);
+    public DoubleProperty  cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13);
     public IntegerProperty hueMin = new IntegerProperty(this, "Hue minimum value", 5);
     public IntegerProperty hueMax = new IntegerProperty(this, "Hue maximum value", 15);
     public IntegerProperty satMin = new IntegerProperty(this, "Saturation minimum value", 120);
@@ -126,7 +128,7 @@ extends WPILaptopCameraExtension {
                 
                 for(int x = 0;x<checkedPolygons.length;x++){
                 
-                    int centerX, centerY, YPos, XPos;
+                    double centerX, centerY, YPos, XPos, YAngle, XAngle;
                     WPIPolygon y = checkedPolygons[x];
                 
                     centerX = y.getX() + (y.getWidth()/2);
@@ -135,8 +137,13 @@ extends WPILaptopCameraExtension {
                     XPos = (2*centerX)/rawImage.getWidth() - 1;
                     YPos = (2*centerY)/rawImage.getHeight() - 1;
                     
-                    outputTable.putNumber("X angle ", XPos);
-                    outputTable.putNumber("Y angle ", YPos);
+                    YAngle = YPos * (cameraYAngle.getValue()/2);
+                    XAngle = XPos * (cameraXAngle.getValue()/2);
+                    
+                    outputTable.putNumber("X position ", XPos);
+                    outputTable.putNumber("Y position ", YPos);
+                    outputTable.putNumber("Horizontal angle", XAngle);
+                    outputTable.putNumber("Vertical angle", YAngle);
                     outputTable.putBoolean("Found target ", true);
                 }
                             
