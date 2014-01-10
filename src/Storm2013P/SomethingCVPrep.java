@@ -32,6 +32,11 @@ import java.util.logging.Logger;
 import javax.swing.JDialog;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.smartdashboard.robot.Robot;
+import java.awt.Image;
+import java.io.File;
+import java.io.IOException;
+import java.util.Scanner;
+import javax.imageio.ImageIO;
 
 /**
  *
@@ -310,5 +315,33 @@ extends WPILaptopCameraExtension {
     }
        public static double distanceForm(double x1, double y1, double x2, double y2){
            return (Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
+       }
+       
+       public static void main(String[] args) throws IOException{
+           
+           SomethingCVPrep cv = new SomethingCVPrep();
+           
+           Scanner scanner = new Scanner(System.in);
+           
+           for(int x = 0; x<args.length; x++){
+               String filename = args[x];
+               
+               System.out.println(filename + ": ");
+               
+               WPIColorImage rawImage;
+               
+               try {
+                  rawImage = new WPIColorImage(ImageIO.read(new File(filename)));
+               } catch (IOException e) {
+                  System.err.println("Could not find file!");
+                  return;
+            }
+               
+               WPIImage result;
+               
+               result = cv.processImage(rawImage);
+               
+               
+           }
        }
     }
