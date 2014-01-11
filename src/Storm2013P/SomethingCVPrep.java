@@ -3,8 +3,9 @@
  * and open the template in the editor.
  */
 package Storm2013P; 
-import com.googlecode.javacv.cpp.opencv_core;
-import com.googlecode.javacv.cpp.opencv_core.IplImage;
+import com.googlecode.javacv.CanvasFrame;
+import static com.googlecode.javacv.cpp.opencv_core.*;
+import static com.googlecode.javacv.cpp.opencv_imgproc.*;
 import edu.wpi.first.smartdashboard.camera.WPICameraExtension;
 import edu.wpi.first.smartdashboard.properties.IntegerProperty;
 import edu.wpi.first.wpijavacv.WPIColorImage;
@@ -85,6 +86,9 @@ extends WPILaptopCameraExtension {
             percentAcc = new DoubleProperty(this, "% error for polygon approx", 10);
     
     private IplImage bin;
+    
+    public ArrayList<IplImage> displayedImages = new ArrayList<>();
+    private ArrayList<CanvasFrame> frames = new ArrayList<>();
     
     private static final ITable outputTable = Robot.getTable();
     
@@ -170,34 +174,34 @@ extends WPILaptopCameraExtension {
         IplConvKernel morphKernel;
         morphKernel = IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);;
         
-        hueMinImg = IplImage.create(opencv_core.cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        satMinImg = IplImage.create(opencv_core.cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        valMinImg = IplImage.create(opencv_core.cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        bin = IplImage.create(opencv_core.cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        temp = IplImage.create(opencv_core.cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
+        hueMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
+        satMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
+        valMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
+        bin = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
+        temp = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
         
         IplImage camIn = StormExtensions.getIplImage(rawImage);
-        IplImage hsv =IplImage.create(opencv_core.cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 3);
+        IplImage hsv =IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 3);
         opencv_imgproc.cvCvtColor(camIn, hsv, opencv_imgproc.CV_BGR2HSV);
-        opencv_core.cvSplit(hsv, hueMinImg, satMinImg, valMinImg, null);
+        cvSplit(hsv, hueMinImg, satMinImg, valMinImg, null);
         
         opencv_imgproc.cvThreshold(hueMinImg, bin, hueMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
         opencv_imgproc.cvThreshold(hueMinImg, temp, hueMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
-        opencv_core.cvAnd(temp, bin, hueMinImg, null);
+        cvAnd(temp, bin, hueMinImg, null);
         
         opencv_imgproc.cvThreshold(satMinImg, bin, satMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
         opencv_imgproc.cvThreshold(satMinImg, temp, satMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
-        opencv_core.cvAnd(temp, bin, satMinImg, null);
+        cvAnd(temp, bin, satMinImg, null);
                 
         opencv_imgproc.cvThreshold(valMinImg, bin, valMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
         opencv_imgproc.cvThreshold(valMinImg, temp, valMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
-        opencv_core.cvAnd(temp, bin, bin, null);
+        cvAnd(temp, bin, bin, null);
         
-        opencv_core.cvAnd(satMinImg, bin, bin, null);
-        opencv_core.cvAnd(hueMinImg, bin, bin, null);
+        cvAnd(satMinImg, bin, bin, null);
+        cvAnd(hueMinImg, bin, bin, null);
         
         opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, closings.getValue());
         
@@ -317,12 +321,15 @@ extends WPILaptopCameraExtension {
            return (Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
        }
        
-       public static void main(String[] args) throws IOException{
+       public static void main(String[] args){
            
            SomethingCVPrep cv = new SomethingCVPrep();
            
            Scanner scanner = new Scanner(System.in);
-           
+           if(args.length == 0){
+               System.out.println("Put in filenames seperated by spaces");
+               System.exit(0);
+           }
            for(int x = 0; x<args.length; x++){
                String filename = args[x];
                
@@ -341,7 +348,20 @@ extends WPILaptopCameraExtension {
                
                result = cv.processImage(rawImage);
                
+               cv.displayImage("Result: " + filename, StormExtensions.getIplImage(result));
                
+               System.out.println("Enter continues");
+               
+               scanner.nextLine();
            }
        }
+       
+       public void displayImage(String title,IplImage image) {
+            IplImage newImage = IplImage.create(image.cvSize(), image.depth(), image.nChannels());
+            cvCopy(image, newImage);
+            displayedImages.add(newImage);
+            CanvasFrame result = new CanvasFrame(title);
+            result.showImage(newImage.getBufferedImage());
+            frames.add(result);
+        }
     }
