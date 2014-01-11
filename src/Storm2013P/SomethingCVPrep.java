@@ -59,12 +59,12 @@ extends WPILaptopCameraExtension {
     
     public DoubleProperty  cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47);
     public DoubleProperty  cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13);
-    public IntegerProperty hueMin = new IntegerProperty(this, "Hue minimum value", 5);
-    public IntegerProperty hueMax = new IntegerProperty(this, "Hue maximum value", 15);
-    public IntegerProperty satMin = new IntegerProperty(this, "Saturation minimum value", 120);
-    public IntegerProperty satMax = new IntegerProperty(this, "Saturation maximum value", 200);
-    public IntegerProperty valMin = new IntegerProperty(this, "Value minimum value", 60);
-    public IntegerProperty valMax = new IntegerProperty(this, "Value maximum value", 255);
+    public IntegerProperty hueMin = new IntegerProperty(this, "Hue minimum value", 85);
+    public IntegerProperty hueMax = new IntegerProperty(this, "Hue maximum value", 130);
+    public IntegerProperty satMin = new IntegerProperty(this, "Saturation minimum value", 110);
+    public IntegerProperty satMax = new IntegerProperty(this, "Saturation maximum value", 185);
+    public IntegerProperty valMin = new IntegerProperty(this, "Value minimum value", 0);
+    public IntegerProperty valMax = new IntegerProperty(this, "Value maximum value", 185);
     public IntegerProperty closings = new IntegerProperty(this, "Closing iterations", 2);
     public ColorProperty colorProp = new ColorProperty(this, "Contour color", Color.BLACK);
     public IplConvKernel morphologyKernel;
@@ -77,12 +77,12 @@ extends WPILaptopCameraExtension {
     private WPIImage _ret;
             
     public DoubleProperty
-            distance = new DoubleProperty(this, "Radius for circle", .2),
-            range = new DoubleProperty(this, "Margin of error", 0),
+            distance = new DoubleProperty(this, "Target radius of circle", .2),
+            range = new DoubleProperty(this, "Margin between target and actual radii", 0),
     
-            minRatio = new DoubleProperty(this, "Minimum value for target ratio", 0.25),
-            maxRatio = new DoubleProperty(this, "Maximum value for target ratio", 0.50),
-            targetMargin  = new DoubleProperty(this, "Margin of error for target dimensions", 2.0),
+            //minRatio = new DoubleProperty(this, "Minimum value for target ratio", 0.25),
+            //maxRatio = new DoubleProperty(this, "Maximum value for target ratio", 0.50),
+            //targetMargin  = new DoubleProperty(this, "Margin of error for target dimensions", 2.0),
             percentAcc = new DoubleProperty(this, "% error for polygon approx", 10);
     
     private IplImage bin;
@@ -98,7 +98,7 @@ extends WPILaptopCameraExtension {
         processing.add("Contours", processingSteps.contours);
         processing.add("Everything", processingSteps.everything);
         try {
-            System.setOut(new PrintStream("C:\\Program Files\\SmartDashboard\\stdout.txt"));
+            System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
         } catch (FileNotFoundException ex) {
             Logger.getLogger(SomethingCVPrep.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -106,7 +106,7 @@ extends WPILaptopCameraExtension {
     
     @Override
     public WPIImage processImage(WPIColorImage rawImage){
-        if(processing.getValue().equals(processingSteps.doNothing)){return rawImage;}
+        if(processing.getValue()== (processingSteps.doNothing)){return rawImage;}
         
         WPIBinaryImage thresholds;
         WPIContour [] countours;
@@ -295,8 +295,8 @@ extends WPILaptopCameraExtension {
            xAverage /= circleChecked.get(x).getPoints().length;
            yAverage /= circleChecked.get(x).getPoints().length;
            for(int y=0;y<circleChecked.get(x).getPoints().length;y++){
-               if(!(distanceForm(xAverage, yAverage, circleChecked.get(x).getPoints()[y].getX(), circleChecked.get(x).getPoints()[y].getY()) < (distance.getValue() + range.getValue()) &&
-                       distanceForm(xAverage, yAverage, circleChecked.get(x).getPoints()[y].getX(), circleChecked.get(x).getPoints()[y].getY()) > (distance.getValue() - range.getValue()))){
+               double radius = distanceForm(xAverage, yAverage, circleChecked.get(x).getPoints()[y].getX(), circleChecked.get(x).getPoints()[y].getY());
+               if(!(Math.abs((radius/distance.getValue()) - 1) <= range.getValue())){
                    notCircle = true;
                }
            }
@@ -346,6 +346,7 @@ extends WPILaptopCameraExtension {
                
                WPIImage result;
                
+               cv.processing.setValue(processingSteps.everything);
                result = cv.processImage(rawImage);
                
                cv.displayImage("Result: " + filename, StormExtensions.getIplImage(result));
