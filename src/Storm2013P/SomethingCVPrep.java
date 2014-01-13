@@ -264,6 +264,7 @@ extends WPICameraExtension {
         ArrayList<WPIPolygon> polygons = new ArrayList<WPIPolygon>();
         ArrayList<WPIPolygon> rectangles = new ArrayList<WPIPolygon>();
         WPIPolygon [] rects;
+        boolean [] isVertical = new boolean [4];
         int q = 0;
         ArrayList<WPIPolygon> checkedPolygons = new ArrayList<WPIPolygon>();
                 
@@ -286,7 +287,13 @@ extends WPICameraExtension {
                 boolean orderChecks = false;
                 if(p.isConvex() && p.getNumVertices() == vertices){
                     points = p.getPoints();
+                    
+                    
+                    
                     for(int x = 0; x< vertices;x++){
+                        if(checkVert(points[x], points[(x+1) % vertices])){
+                            isVertical[x] = true;
+                        }
                         if(diff(points[x].getX(), points[(x+1) %vertices].getX()) > 
                                 diff(points[x].getY(), points[(x+1) %vertices].getY())){
                             sideOrder[x] = 1;
@@ -297,13 +304,17 @@ extends WPICameraExtension {
                             }
                         }
                     }
-                
+                    
+
+                    
                     for(int x = 0; x<vertices; x++){
                         if(!(sideOrder[x] + sideOrder[(x+1) %vertices] == 3)){
                             orderChecks = false;
                         }
                     }
+                    
                 }
+                
                 if(!orderChecks){
                     polygons.remove(y);   
                 }
@@ -329,6 +340,10 @@ extends WPICameraExtension {
         
     public int diff(int x1, int x2){
         return Math.abs(x1 - x2);
+    }
+    
+    public boolean checkVert(WPIPoint x1, WPIPoint x2){
+        return (Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
     }
     
     public WPIPolygon[] findCircle(WPIContour[] contours, int vertices){
