@@ -98,8 +98,8 @@ extends WPICameraExtension {
             percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 10),
             percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 10),
             
-            finalRatio = new DoubleProperty(this, "Ratio of sides, b:h", .8),
-            finalMargin = new DoubleProperty(this, "Margin for above ratio", .1);
+            finalRatio = new DoubleProperty(this, "Ratio of sides, b:h", 4.5),
+            finalMargin = new DoubleProperty(this, "Margin for above ratio", .5);
     
     private IplImage bin;
     public boolean [] isVertical = new boolean [4];
