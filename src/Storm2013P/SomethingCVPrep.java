@@ -97,7 +97,7 @@ extends WPICameraExtension {
     
     private IplImage bin;
     public boolean [] isVertical = new boolean [4];
-    public ArrayList<Boolean> verticalRect;
+    public ArrayList<Boolean> verticalAspects;
     
     public ArrayList<IplImage> displayedImages = new ArrayList<>();
     private ArrayList<CanvasFrame> frames = new ArrayList<>();
@@ -105,7 +105,7 @@ extends WPICameraExtension {
     private static final ITable outputTable = Robot.getTable();
     
     public SomethingCVPrep() {
-        this.verticalRect = new ArrayList();
+        this.verticalAspects = new ArrayList();
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
         processing.add("Nothing", processingSteps.doNothing);
@@ -205,10 +205,9 @@ extends WPICameraExtension {
                         ArrayList<WPIPolygon> horizontalRectangleList = new ArrayList<>();
                         ArrayList<WPIPolygon> verticalRectangleList = new ArrayList<>();
                         
-                        for(int x = 0;x<checkedPolygons.length;x++){
+                        for(WPIPolygon y: checkedPolygons){
 
                             double centerX, centerY, YPos, XPos, YAngle, XAngle;
-                            WPIPolygon y = checkedPolygons[x];
 
                             centerX = y.getX() + (y.getWidth()/2);
                             centerY = y.getY() + (y.getHeight()/2);
@@ -224,13 +223,13 @@ extends WPICameraExtension {
                             outputTable.putNumber("Target horizontal angle", XAngle);
                             outputTable.putNumber("Target vertical angle", YAngle);
                             outputTable.putBoolean("Found target ", true);
-                            if(!verticalRect.isEmpty()){
-                                if(verticalRect.get(x)){
-                                    verticalRectangleList.add(y);
-                                }else{
-                                    horizontalRectangleList.add(y);
-                                }
+                            
+                            if(isVert(y)){
+                                verticalRectangleList.add(y);
+                            }else{
+                                horizontalRectangleList.add(y);
                             }
+                            
                         }
                         
                         WPIPolygon[] verticalRectangle = new WPIPolygon[verticalRectangleList.size()];
@@ -360,13 +359,6 @@ extends WPICameraExtension {
                         orderChecks = false;
                         
                     }
-                    if(orderChecks){
-                        if(aspectRatio <= 1){
-                            verticalRect.add(true);
-                        }else{
-                            verticalRect.add(false);
-                        }
-                    }
                     
                 }
                 
@@ -396,6 +388,25 @@ extends WPICameraExtension {
     public int diff(int x1, int x2){
         return Math.abs(x1 - x2);
     }
+    
+    public boolean isVert(WPIPolygon p){
+        WPIPoint[] points = p.getPoints();
+        double averageSide0 = (distanceForm(points[0].getX(), points[0].getY(), points[2].getX(), points[2].getY()));
+        double averageSide1 = (distanceForm(points[1].getX(), points[1].getY(), points[3].getX(), points[3].getY()));
+        double aspectRatio;
+        if(checkVert(points[0], points[1])){
+            aspectRatio = averageSide1/averageSide0;    
+        }else{
+            aspectRatio = averageSide0/averageSide1;
+        }
+        
+        if(aspectRatio <= 1){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
     
     public boolean checkVert(WPIPoint x1, WPIPoint x2){
         return (Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
