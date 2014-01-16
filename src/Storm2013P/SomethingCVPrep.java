@@ -55,7 +55,7 @@ extends WPICameraExtension {
 
 
     public enum processingSteps{
-        doNothing,threshold,contours,everything
+        doNothing,thresholdBall, thresholdTarget,contours,everything
     }
     
     public DoubleProperty  cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47);
@@ -112,7 +112,8 @@ extends WPICameraExtension {
     
     public SomethingCVPrep() {
         this.verticalRect = new ArrayList();
-        processing.add("Threshold", processingSteps.threshold);
+        processing.add("Threshold Ball", processingSteps.thresholdBall);
+        processing.add("Threshold Target", processingSteps.thresholdTarget);
         processing.add("Nothing", processingSteps.doNothing);
         processing.add("Contours", processingSteps.contours);
         processing.add("Everything", processingSteps.everything);
@@ -123,34 +124,47 @@ extends WPICameraExtension {
         }
     }
     
+    
     @Override
     public WPIImage processImage(WPIColorImage rawImage){
         if(processing.getValue()== (processingSteps.doNothing)){return rawImage;}
-        for(int i = 0;i<2;i++){
+        for(int i = 0;i<2;i++){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
             WPIBinaryImage thresholds;
             WPIContour [] countours;
             WPIPolygon [] checkedPolygons;
             WPIColor wpiCircleColorProp = new WPIColor(circleColorProp.getValue());
             WPIColor wpiHorizontalColorProp = new WPIColor(horizontalColorProp.getValue());
             WPIColor wpiVerticalColorProp = new WPIColor(verticalColorProp.getValue());
+            IplImage thresholdIPL;
             
             if(i==0){
                 thresholds = findThresholds(rawImage, hueMinCircle.getValue(), hueMaxCircle.getValue(), satMinCircle.getValue(), satMaxCircle.getValue(), valMinCircle.getValue(), valMaxCircle.getValue());
+                thresholdIPL = StormExtensions.getIplImage(thresholds);
+                if(processing.getValue() == processingSteps.thresholdBall){
+                // Allocate ret if it's the first time, otherwise reuse it.
+                    if(ret == null) {
+                        ret = StormExtensions.makeWPIGrayscaleImage(thresholdIPL);
+                    } else {
+                        StormExtensions.copyImage(ret, thresholdIPL);
+                    }
+
+                    return ret;
+                }
             }else{
                 thresholds = findThresholds(rawImage, hueMinSquare.getValue(), hueMaxSquare.getValue(), satMinSquare.getValue(), satMaxSquare.getValue(), valMinSquare.getValue(), valMaxSquare.getValue());
-            }
-            if(processing.getValue() == processingSteps.threshold){
-                // Allocate _ret if it's the first time, otherwise reuse it.
-                if(ret == null) {
-                    ret = StormExtensions.makeWPIGrayscaleImage(bin);
-                } else {
-                    StormExtensions.copyImage(ret, bin);
+                thresholdIPL = StormExtensions.getIplImage(thresholds);
+                if(processing.getValue() == processingSteps.thresholdTarget){
+                // Allocate ret if it's the first time, otherwise reuse it.
+                    if(ret == null) {
+                        ret = StormExtensions.makeWPIGrayscaleImage(thresholdIPL);
+                    } else {
+                        StormExtensions.copyImage(ret, thresholdIPL);
+                    }
+
+                    return ret;
                 }
-
-                return ret;
             }
-
-
+            
             countours = StormExtensions.findConvexContours(thresholds);
 
             if(processing.getValue() == processingSteps.contours){rawImage.drawContours(countours, wpiCircleColorProp, width.getValue());return rawImage;}
@@ -214,11 +228,12 @@ extends WPICameraExtension {
                             outputTable.putNumber("Target horizontal angle", XAngle);
                             outputTable.putNumber("Target vertical angle", YAngle);
                             outputTable.putBoolean("Found target ", true);
-                            
-                            if(verticalRect.get(x)){
-                                verticalRectangleList.add(y);
-                            }else{
-                                horizontalRectangleList.add(y);
+                            if(!verticalRect.isEmpty()){
+                                if(verticalRect.get(x)){
+                                    verticalRectangleList.add(y);
+                                }else{
+                                    horizontalRectangleList.add(y);
+                                }
                             }
                         }
                         
