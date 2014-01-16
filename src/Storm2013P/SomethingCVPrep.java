@@ -55,7 +55,7 @@ extends WPICameraExtension {
 
 
     public enum processingSteps{
-        doNothing,thresholdBall, thresholdTarget,contours,everything
+        doNothing,thresholdBall, thresholdTarget,contoursBall, contoursTarget,everything
     }
     
     public DoubleProperty  cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47);
@@ -82,19 +82,13 @@ extends WPICameraExtension {
     public IntegerProperty 
             width = new IntegerProperty(this, "Contour width", 5),
             verticesCirc = new IntegerProperty(this, "Number of vertices", 8),
-            verticesRect = new IntegerProperty(this, "Number of vertices", 4),
-            targetWidth = new IntegerProperty(this, "Target width for targets", 62),
-            targetHeight = new IntegerProperty(this, "Target height for targets", 20);
+            verticesRect = new IntegerProperty(this, "Number of vertices", 4);
             
     private WPIImage ret;
             
     public DoubleProperty
             distance = new DoubleProperty(this, "Target radius of circle", .2),
             range = new DoubleProperty(this, "Margin between target and actual radii", 0),
-    
-            minRatio = new DoubleProperty(this, "Minimum value for target ratio", 0.25),
-            maxRatio = new DoubleProperty(this, "Maximum value for target ratio", 0.50),
-            targetMargin  = new DoubleProperty(this, "Margin of error for target area", 2.0),
             percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 10),
             percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 10),
             
@@ -115,7 +109,8 @@ extends WPICameraExtension {
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
         processing.add("Nothing", processingSteps.doNothing);
-        processing.add("Contours", processingSteps.contours);
+        processing.add("Contour Ball", processingSteps.contoursBall);
+        processing.add("Contour Target", processingSteps.contoursTarget);
         processing.add("Everything", processingSteps.everything);
         try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
@@ -167,7 +162,8 @@ extends WPICameraExtension {
             
             countours = StormExtensions.findConvexContours(thresholds);
 
-            if(processing.getValue() == processingSteps.contours){rawImage.drawContours(countours, wpiCircleColorProp, width.getValue());return rawImage;}
+            if(processing.getValue() == processingSteps.contoursBall && i == 0){rawImage.drawContours(countours, wpiCircleColorProp, width.getValue());return rawImage;
+            }else{if(processing.getValue() == processingSteps.contoursTarget && i == 1){rawImage.drawContours(countours, wpiCircleColorProp, width.getValue());return rawImage;}}
             
             if(i == 0){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
                 if(countours.length != 0){
@@ -317,11 +313,9 @@ extends WPICameraExtension {
         for(WPIContour c:countours){
             
             double sideRatio = ((double)c.getHeight()/(double)c.getWidth());
-            int targetArea = targetHeight.getValue() * targetWidth.getValue();
-            if(sideRatio < maxRatio.getValue() && sideRatio > minRatio.getValue() 
-                    && targetArea > (targetArea - targetMargin.getValue()) && targetArea < (targetArea + targetMargin.getValue())){
+            
                 polygons.add(c.approxPolygon(percentAccRect.getValue())); q++; System.out.println("Added " + q + "polygon");
-            }
+            
         
             for(int y = 0; y < polygons.size(); y++){
                 int centerX, centerY, YPos, XPos;
