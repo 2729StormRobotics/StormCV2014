@@ -92,8 +92,10 @@ extends WPICameraExtension {
             percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 10),
             percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 10),
             
-            finalRatio = new DoubleProperty(this, "Ratio of sides, b:h", 4.5),
-            finalMargin = new DoubleProperty(this, "Margin for above ratio", .5);
+            verticalTargetRatio = new DoubleProperty(this, "Ratio of vertical target, b:h", 0.125), //for last year's target, use 0.5
+            verticalTargetMargin = new DoubleProperty(this, "Margin for vertical ratio", .04), //for last year's target, use 0.3
+            horizontalTargetRatio = new DoubleProperty(this, "Ratio of horizontal target, b:h", 5.875), //for last year's target, use 2.0
+            horizontalTargetMargin = new DoubleProperty(this, "Margin for horizontal ratio", .3); //for last year's target, use 0.9
     
     private IplImage bin;
     public boolean [] isVertical = new boolean [4];
@@ -223,6 +225,7 @@ extends WPICameraExtension {
                             outputTable.putNumber("Target horizontal angle", XAngle);
                             outputTable.putNumber("Target vertical angle", YAngle);
                             outputTable.putBoolean("Found target ", true);
+                            //System.out.println("About to call isVert");
                             
                             if(isVert(y)){
                                 verticalRectangleList.add(y);
@@ -232,14 +235,59 @@ extends WPICameraExtension {
                             
                         }
                         
-                        WPIPolygon[] verticalRectangle = new WPIPolygon[verticalRectangleList.size()];
-                        WPIPolygon[] horizontalRectangle = new WPIPolygon[horizontalRectangleList.size()];
+                        ArrayList<WPIPolygon> finalVertical = new ArrayList<>();
+                        ArrayList<WPIPolygon> finalHorizontal = new ArrayList<>();
                         
-                        for(int j = 0;j<verticalRectangleList.size();j++){
-                            verticalRectangle[j] = verticalRectangleList.get(j);
+                        for(WPIPolygon p : verticalRectangleList){
+                            double [] sideLengths = new double[verticesRect.getValue().intValue()];
+                            
+                            
+                            WPIPoint [] points;
+                            points = p.getPoints();
+                            for(int j = 0;j<verticesRect.getValue().intValue();j++){
+                                sideLengths[j]=distanceForm(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
+                            }
+
+                            double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
+                            double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
+                            
+                            double aspectRatio = averageSide2/averageSide1;
+                            System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
+                            if(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < verticalTargetMargin.getValue().doubleValue()){
+                                finalVertical.add(p);
+                            }
                         }
-                        for(int j = 0;j<horizontalRectangleList.size();j++){
-                            horizontalRectangle[j] = horizontalRectangleList.get(j);
+                        for(WPIPolygon p : horizontalRectangleList){
+                            double [] sideLengths = new double[verticesRect.getValue().intValue()];
+                            
+                            WPIPoint [] points;
+                            points = p.getPoints();
+                            for(int j = 0;j<verticesRect.getValue().intValue();j++){
+                                sideLengths[j]=distanceForm(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
+                            }
+
+                            double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
+                            double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
+                            
+                            //System.out.println(averageSide2);
+                            
+                            double aspectRatio = averageSide2/averageSide1;
+                            System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
+                            
+                            if(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < horizontalTargetMargin.getValue().doubleValue()){
+                                finalHorizontal.add(p);
+                            }
+                        }
+                        
+                        WPIPolygon[] verticalRectangle = new WPIPolygon[finalVertical.size()];
+                        WPIPolygon[] horizontalRectangle = new WPIPolygon[finalHorizontal.size()];
+                        
+                        for(int j = 0;j<finalVertical.size();j++){
+                            
+                            verticalRectangle[j] = finalVertical.get(j);
+                        }
+                        for(int j = 0;j<finalHorizontal.size();j++){
+                            horizontalRectangle[j] = finalHorizontal.get(j);
                         }
                         
                         rawImage.drawPolygons(verticalRectangle, wpiVerticalColorProp, width.getValue());
@@ -313,7 +361,7 @@ extends WPICameraExtension {
             
             double sideRatio = ((double)c.getHeight()/(double)c.getWidth());
             
-                polygons.add(c.approxPolygon(percentAccRect.getValue())); q++; System.out.println("Added " + q + "polygon");
+                polygons.add(c.approxPolygon(percentAccRect.getValue())); q++; //System.out.println("Added " + q + "polygon");
             
         
             for(int y = 0; y < polygons.size(); y++){
@@ -321,7 +369,6 @@ extends WPICameraExtension {
 
                 WPIPolygon p = polygons.get(y);
 
-                double [] sideLengths = new double[vertices]; //1 means side is horizontal, 2 means it is vertical, 0 means it's perfectly diagonal
                 double aspectRatio;
                 WPIPoint [] points;
                 boolean orderChecks = true;
@@ -331,7 +378,6 @@ extends WPICameraExtension {
                 }
                 
                 points = p.getPoints();
-
                 //System.out.println(vertices);
 
                 for(int x = 0; x< vertices;x++){
@@ -346,24 +392,10 @@ extends WPICameraExtension {
                 if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3]) || (!isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
                     orderChecks = false;
                 }
-                for(int i = 0;i<vertices;i++){
-                    sideLengths[i]=distanceForm(points[i].getX(), points[i].getY(), points[(i+1) % vertices].getX(), points[(i+1) % vertices].getY());
-                }
-
-                double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
-                double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
-
-                if(isVertical[0] && orderChecks){
-                    aspectRatio = averageSide2/averageSide1;
-                }else{
-                    aspectRatio = averageSide1/averageSide2;
-                }
-
-                if(Math.abs(finalRatio.getValue() - aspectRatio) > finalMargin.getValue()){
-                    orderChecks = false;
-
-                }
                 
+
+                
+
                 if(orderChecks){
                     checkedPolygons.add(p);
                 }
@@ -399,7 +431,7 @@ extends WPICameraExtension {
         }else{
             aspectRatio = averageSide0/averageSide1;
         }
-        System.out.println(aspectRatio);
+        //System.out.println(aspectRatio);
         if(aspectRatio <= 1){
             return true;
         }else{
