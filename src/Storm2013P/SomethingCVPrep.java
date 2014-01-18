@@ -112,11 +112,11 @@ extends WPICameraExtension {
         processing.add("Contour Ball", processingSteps.contoursBall);
         processing.add("Contour Target", processingSteps.contoursTarget);
         processing.add("Everything", processingSteps.everything);
-        try {
+        /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
         } catch (FileNotFoundException ex) {
             Logger.getLogger(SomethingCVPrep.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        }*/
     }
     
     
@@ -199,7 +199,7 @@ extends WPICameraExtension {
                 }
             }else{
                 if(countours.length != 0){
-                    checkedPolygons = checkPolygons(countours, verticesRect.getValue());
+                    checkedPolygons = checkPolygons(countours, verticesRect.getValue().intValue());
                     if(checkedPolygons != null && checkedPolygons.length !=0){
 
                         ArrayList<WPIPolygon> horizontalRectangleList = new ArrayList<>();
@@ -238,7 +238,7 @@ extends WPICameraExtension {
                         for(int j = 0;j<verticalRectangleList.size();j++){
                             verticalRectangle[j] = verticalRectangleList.get(j);
                         }
-                        for(int j = 0;j<verticalRectangleList.size();j++){
+                        for(int j = 0;j<horizontalRectangleList.size();j++){
                             horizontalRectangle[j] = horizontalRectangleList.get(j);
                         }
                         
@@ -299,7 +299,7 @@ extends WPICameraExtension {
         
     }
     
-    public WPIPolygon[] checkPolygons(WPIContour[] countours, Integer vertices) {
+    public WPIPolygon[] checkPolygons(WPIContour[] countours, int vertices) {
         
         //System.out.println("Got in well enough");
         ArrayList<WPIPolygon> polygons = new ArrayList<WPIPolygon>();
@@ -325,52 +325,52 @@ extends WPICameraExtension {
                 double aspectRatio;
                 WPIPoint [] points;
                 boolean orderChecks = true;
-                if(p.isConvex() && p.getNumVertices() == vertices){
-                    points = p.getPoints();
-                    
-                    
-                    
-                    for(int x = 0; x< vertices;x++){
-                        if(checkVert(points[x], points[(x+1) % vertices])){
-                            isVertical[x] = true;
-                        }else{
-                            isVertical[x] = false;
-                        }
-                        
-                    }
-                    
-                    if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3]) || (!isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
-                        orderChecks = false;
-                    }
-                    for(int i = 0;i<vertices;i++){
-                        sideLengths[i]=distanceForm(points[i].getX(), points[i].getY(), points[(i+1) % vertices].getX(), points[(i+1) % vertices].getY());
-                    }
-                    
-                    double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
-                    double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
-                    
-                    if(isVertical[0] && orderChecks){
-                        aspectRatio = averageSide2/averageSide1;
-                    }else{
-                        aspectRatio = averageSide1/averageSide2;
-                    }
-                    
-                    if(Math.abs(finalRatio.getValue() - aspectRatio) > finalMargin.getValue()){
-                        orderChecks = false;
-                        
-                    }
-                    
+                //System.out.println(p.isConvex() + "   " + p.getNumVertices() + "   " + vertices);
+                if(!p.isConvex() || p.getNumVertices() != vertices){
+                    continue;
                 }
                 
-                if(!orderChecks){
-                    polygons.remove(y);   
+                points = p.getPoints();
+
+                //System.out.println(vertices);
+
+                for(int x = 0; x< vertices;x++){
+                    if(checkVert(points[x], points[(x+1) % vertices])){
+                        isVertical[x] = true;
+                    }else{
+                        isVertical[x] = false;
+                    }
+
+                }
+
+                if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3]) || (!isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
+                    orderChecks = false;
+                }
+                for(int i = 0;i<vertices;i++){
+                    sideLengths[i]=distanceForm(points[i].getX(), points[i].getY(), points[(i+1) % vertices].getX(), points[(i+1) % vertices].getY());
+                }
+
+                double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
+                double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
+
+                if(isVertical[0] && orderChecks){
+                    aspectRatio = averageSide2/averageSide1;
+                }else{
+                    aspectRatio = averageSide1/averageSide2;
+                }
+
+                if(Math.abs(finalRatio.getValue() - aspectRatio) > finalMargin.getValue()){
+                    orderChecks = false;
+
+                }
+                
+                if(orderChecks){
+                    checkedPolygons.add(p);
                 }
             
             
             }
-            if(polygons.size() != 0){
-               checkedPolygons.addAll(polygons);
-            }
+            
     
             
         }
@@ -391,15 +391,15 @@ extends WPICameraExtension {
     
     public boolean isVert(WPIPolygon p){
         WPIPoint[] points = p.getPoints();
-        double averageSide0 = (distanceForm(points[0].getX(), points[0].getY(), points[2].getX(), points[2].getY()));
-        double averageSide1 = (distanceForm(points[1].getX(), points[1].getY(), points[3].getX(), points[3].getY()));
+        double averageSide0 = ((distanceForm(points[0].getX(), points[0].getY(), points[1].getX(), points[1].getY())) + (distanceForm(points[2].getX(), points[2].getY(), points[3].getX(), points[3].getY())))/2;
+        double averageSide1 = ((distanceForm(points[1].getX(), points[1].getY(), points[2].getX(), points[2].getY())) + (distanceForm(points[3].getX(), points[3].getY(), points[0].getX(), points[0].getY())))/2;
         double aspectRatio;
         if(checkVert(points[0], points[1])){
             aspectRatio = averageSide1/averageSide0;    
         }else{
             aspectRatio = averageSide0/averageSide1;
         }
-        
+        System.out.println(aspectRatio);
         if(aspectRatio <= 1){
             return true;
         }else{
