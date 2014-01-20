@@ -78,7 +78,7 @@ extends WPICameraExtension {
             circleColorProp = new ColorProperty(this, "Contour color for the ball", Color.BLACK),
             horizontalColorProp = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
             verticalColorProp = new ColorProperty(this, "Contour color for the vertical target", Color.CYAN);
-    public IplConvKernel morphologyKernel;
+    //public IplConvKernel morphologyKernel;
     public IntegerProperty 
             width = new IntegerProperty(this, "Contour width", 5),
             verticesCirc = new IntegerProperty(this, "Number of vertices", 8),
@@ -99,7 +99,6 @@ extends WPICameraExtension {
     
     private IplImage bin;
     public boolean [] isVertical = new boolean [4];
-    public ArrayList<Boolean> verticalAspects;
     
     public ArrayList<IplImage> displayedImages = new ArrayList<>();
     private ArrayList<CanvasFrame> frames = new ArrayList<>();
@@ -107,7 +106,6 @@ extends WPICameraExtension {
     private static final ITable outputTable = Robot.getTable();
     
     public SomethingCVPrep() {
-        this.verticalAspects = new ArrayList();
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
         processing.add("Nothing", processingSteps.doNothing);
@@ -186,17 +184,17 @@ extends WPICameraExtension {
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
 
-                            outputTable.putNumber("Ball X position ", XPos);
-                            outputTable.putNumber("Ball Y position ", YPos);
+                            outputTable.putNumber("Ball X position", XPos);
+                            outputTable.putNumber("Ball Y position", YPos);
                             outputTable.putNumber("Ball horizontal angle", XAngle);
                             outputTable.putNumber("Ball vertical angle", YAngle);
-                            outputTable.putBoolean("Found ball ", true);
+                            outputTable.putBoolean("Found ball", true);
                         }
 
                         rawImage.drawPolygons(checkedPolygons, wpiCircleColorProp, width.getValue());
 
                     }else{
-                        outputTable.putBoolean("Found ball ", false);
+                        outputTable.putBoolean("Found ball", false);
                     }
                 }
             }else{
@@ -220,11 +218,11 @@ extends WPICameraExtension {
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
 
-                            outputTable.putNumber("Target X position ", XPos);
-                            outputTable.putNumber("Target Y position ", YPos);
+                            outputTable.putNumber("Target X position", XPos);
+                            outputTable.putNumber("Target Y position", YPos);
                             outputTable.putNumber("Target horizontal angle", XAngle);
                             outputTable.putNumber("Target vertical angle", YAngle);
-                            outputTable.putBoolean("Found target ", true);
+                            outputTable.putBoolean("Found target", true);
                             //System.out.println("About to call isVert");
                             
                             if(isVert(y)){
@@ -310,7 +308,7 @@ extends WPICameraExtension {
         IplImage valMinImg;
         IplImage temp;
         IplConvKernel morphKernel;
-        morphKernel = IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);;
+        morphKernel = IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);
         
         hueMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
         satMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
