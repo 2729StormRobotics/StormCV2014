@@ -58,8 +58,9 @@ extends WPICameraExtension {
         doNothing,thresholdBall, thresholdTarget,contoursBall, contoursTarget,everything
     }
     
-    public DoubleProperty  cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47);
-    public DoubleProperty  cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13);
+    public DoubleProperty  
+            cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47),
+            cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13);
     public IntegerProperty 
             hueMinCircle = new IntegerProperty(this, "Hue minimum value for circle", 85),
             hueMaxCircle = new IntegerProperty(this, "Hue maximum value for circle", 130),
@@ -73,16 +74,15 @@ extends WPICameraExtension {
             satMaxSquare = new IntegerProperty(this, "Saturation maximum value for rectangle", 255),
             valMinSquare = new IntegerProperty(this, "Value minimum value for rectangle", 60),
             valMaxSquare = new IntegerProperty(this, "Value maximum value for rectangle", 255),
-            closings = new IntegerProperty(this, "Closing iterations", 2);
+            closings     = new IntegerProperty(this, "Closing iterations", 2),
+            width        = new IntegerProperty(this, "Contour width", 5),
+            verticesCirc = new IntegerProperty(this, "Number of vertices", 8),
+            verticesRect = new IntegerProperty(this, "Number of vertices", 4);
     public ColorProperty 
             circleColorProp = new ColorProperty(this, "Contour color for the ball", Color.BLACK),
             horizontalColorProp = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
             verticalColorProp = new ColorProperty(this, "Contour color for the vertical target", Color.CYAN);
     //public IplConvKernel morphologyKernel;
-    public IntegerProperty 
-            width = new IntegerProperty(this, "Contour width", 5),
-            verticesCirc = new IntegerProperty(this, "Number of vertices", 8),
-            verticesRect = new IntegerProperty(this, "Number of vertices", 4);
             
     private WPIImage ret;
             
@@ -101,7 +101,6 @@ extends WPICameraExtension {
     public boolean [] isVertical = new boolean [4];
     
     public ArrayList<IplImage> displayedImages = new ArrayList<>();
-    private ArrayList<CanvasFrame> frames = new ArrayList<>();
     
     private static final ITable outputTable = Robot.getTable();
     
@@ -131,7 +130,7 @@ extends WPICameraExtension {
             WPIColor wpiHorizontalColorProp = new WPIColor(horizontalColorProp.getValue());
             WPIColor wpiVerticalColorProp = new WPIColor(verticalColorProp.getValue());
             IplImage thresholdIPL;
-            
+            //System.out.println("tic");
             if(i==0){
                 thresholds = findThresholds(rawImage, hueMinCircle.getValue(), hueMaxCircle.getValue(), satMinCircle.getValue(), satMaxCircle.getValue(), valMinCircle.getValue(), valMaxCircle.getValue());
                 thresholdIPL = StormExtensions.getIplImage(thresholds);
@@ -235,7 +234,7 @@ extends WPICameraExtension {
                         
                         ArrayList<WPIPolygon> finalVertical = new ArrayList<>();
                         ArrayList<WPIPolygon> finalHorizontal = new ArrayList<>();
-                        
+                        System.out.println("tic-toc");
                         for(WPIPolygon p : verticalRectangleList){
                             double [] sideLengths = new double[verticesRect.getValue().intValue()];
                             
@@ -250,9 +249,11 @@ extends WPICameraExtension {
                             double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
                             
                             double aspectRatio = averageSide2/averageSide1;
-                            System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
+                            //System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
                             if(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < verticalTargetMargin.getValue().doubleValue()){
                                 finalVertical.add(p);
+                            }else{
+                                System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
                             }
                         }
                         for(WPIPolygon p : horizontalRectangleList){
@@ -270,10 +271,12 @@ extends WPICameraExtension {
                             //System.out.println(averageSide2);
                             
                             double aspectRatio = averageSide2/averageSide1;
-                            System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
+                            //System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
                             
                             if(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < horizontalTargetMargin.getValue().doubleValue()){
                                 finalHorizontal.add(p);
+                            }else{
+                                System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
                             }
                         }
                         
@@ -352,14 +355,13 @@ extends WPICameraExtension {
         ArrayList<WPIPolygon> rectangles = new ArrayList<WPIPolygon>();
         WPIPolygon [] rects;
         
-        int q = 0;
         ArrayList<WPIPolygon> checkedPolygons = new ArrayList<WPIPolygon>();
                 
         for(WPIContour c:countours){
             
             double sideRatio = ((double)c.getHeight()/(double)c.getWidth());
             
-                polygons.add(c.approxPolygon(percentAccRect.getValue())); q++; //System.out.println("Added " + q + "polygon");
+                polygons.add(c.approxPolygon(percentAccRect.getValue()));
             
         
             for(int y = 0; y < polygons.size(); y++){
@@ -389,6 +391,7 @@ extends WPICameraExtension {
 
                 if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3]) || (!isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
                     orderChecks = false;
+                    //System.out.println("Failed side order check");
                 }
                 
 
@@ -439,6 +442,7 @@ extends WPICameraExtension {
     
     
     public boolean checkVert(WPIPoint x1, WPIPoint x2){
+        System.out.println(Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
         return (Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
     }
     
@@ -528,6 +532,5 @@ extends WPICameraExtension {
             displayedImages.add(newImage);
             CanvasFrame result = new CanvasFrame(title);
             result.showImage(newImage.getBufferedImage());
-            frames.add(result);
         }
     }
