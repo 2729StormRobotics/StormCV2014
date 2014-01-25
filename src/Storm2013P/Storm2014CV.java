@@ -56,19 +56,20 @@ extends WPICameraExtension {
 
 
     public enum processingSteps{
-        doNothing,thresholdBall, thresholdTarget,contoursBall, contoursTarget,everything
+        doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, perimVArea, everything
     }
     
     public DoubleProperty  
             cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47),
-            cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13);
+            cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
+            screenPercentage = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
     public IntegerProperty 
-            hueMinCircle = new IntegerProperty(this, "Hue minimum value for circle", 85),
-            hueMaxCircle = new IntegerProperty(this, "Hue maximum value for circle", 130),
-            satMinCircle = new IntegerProperty(this, "Saturation minimum value for circle", 110),
-            satMaxCircle = new IntegerProperty(this, "Saturation maximum value for circle", 185),
-            valMinCircle = new IntegerProperty(this, "Value minimum value for circle", 0),
-            valMaxCircle = new IntegerProperty(this, "Value maximum value for circle", 185),
+            hueMinCircle = new IntegerProperty(this, "Hue minimum value for circle", 85), //For red ball, 70, for red ball picture, 1
+            hueMaxCircle = new IntegerProperty(this, "Hue maximum value for circle", 130), //For red ball, 190, for red ball picture, 19
+            satMinCircle = new IntegerProperty(this, "Saturation minimum value for circle", 110), //For red ball, 90, for red ball picture, 200
+            satMaxCircle = new IntegerProperty(this, "Saturation maximum value for circle", 185), //For red ball, 170, for red ball picture, 215
+            valMinCircle = new IntegerProperty(this, "Value minimum value for circle", 0), //For red ball, 80, for red ball picture, 78
+            valMaxCircle = new IntegerProperty(this, "Value maximum value for circle", 185), //For red ball, 230, for red ball picture, 200
             hueMinSquare = new IntegerProperty(this, "Hue minimum value for rectangle", 50),
             hueMaxSquare = new IntegerProperty(this, "Hue maximum value for rectangle", 90),
             satMinSquare = new IntegerProperty(this, "Saturation minimum value for rectangle", 220),
@@ -111,12 +112,15 @@ extends WPICameraExtension {
     
     private static final ITable outputTable = Robot.getTable();
     
+    public double imageWidth, imageHeight;
+    
     public Storm2014CV() {
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
         processing.add("Nothing", processingSteps.doNothing);
         processing.add("Contour Ball", processingSteps.contoursBall);
         processing.add("Contour Target", processingSteps.contoursTarget);
+        processing.add("Only compare Perimeter to Area", processingSteps.perimVArea);
         processing.add("Everything", processingSteps.everything);
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
@@ -139,6 +143,10 @@ extends WPICameraExtension {
             
             rawImage = processImage;
         }
+        
+        imageHeight = rawImage.getHeight();
+        imageWidth = rawImage.getWidth();
+        
         if(processing.getValue()== (processingSteps.doNothing)){return rawImage;}
         
         for(int i = 0;i<2;i++){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
@@ -490,7 +498,7 @@ extends WPICameraExtension {
     
     
     public boolean checkVert(WPIPoint x1, WPIPoint x2){
-        System.out.println(Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
+        //System.out.println(Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
         return (Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
     }
     
@@ -498,10 +506,35 @@ extends WPICameraExtension {
         ArrayList<WPIPolygon> circleChecked = new ArrayList<WPIPolygon> ();
         for(WPIContour x: contours){       
             WPIPolygon poly = x.approxPolygon(percentAccCircle.getValue());
-            double contourArea = cvContourArea(StormExtensions.getCvSeq(x), CV_WHOLE_ARR, 0);
-            if(poly.getNumVertices() >= vertices && x.getlength()/contourArea < ballPerimeterVArea.getValue()){
+            double polygonArea = poly.getArea();
+            double circumference = poly.getPerimeter();
+            if(poly.getNumVertices() < 3){
+                continue;
+            }
+            //System.out.println("");
+            System.out.println("Circumference: " + circumference + "\n" + 
+                    "Area: " + polygonArea + "\n" + 
+                    "Comparison: " + (circumference * circumference)/(4 * Math.PI * polygonArea) + "\n" + 
+                    "Width of ball: " + x.getWidth() + "\n" + 
+                    "Height of ball: " + x.getHeight() + "\n" +
+                    "Width of image: " + imageWidth + "\n" + 
+                    "Height of image: " + imageHeight + "\n");
+            
+            if(poly.getNumVertices() >= vertices && ((x.getWidth()*x.getHeight())/(imageHeight*imageWidth))*100.0 < screenPercentage.getValue()){
+                continue;
+            }
+            if(((circumference * circumference)/(4 * Math.PI * polygonArea) < ballPerimeterVArea.getValue())){
                 circleChecked.add(poly);
             }
+            
+        }
+        
+        if(processing.getValue() == processingSteps.perimVArea){
+            WPIPolygon[] ret = new WPIPolygon[circleChecked.size()];
+            for(int i = 0;i<ret.length;i++){
+                ret[i] = circleChecked.get(i);
+            }
+            return ret;
         }
         for(int x=0;x<circleChecked.size();x++){
             boolean notCircle=false;
