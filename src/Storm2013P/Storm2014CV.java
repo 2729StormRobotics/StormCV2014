@@ -132,6 +132,7 @@ extends WPICameraExtension {
     
     @Override
     public WPIImage processImage(WPIColorImage rawImage){
+        double startTime = System.currentTimeMillis();
         if(imageTest.getValue()){
             try {
                 testImage = new WPIColorImage(ImageIO.read(new File("test.jpg")));
@@ -355,7 +356,10 @@ extends WPICameraExtension {
                     }
                 }
             }
+            thresholdIPL.deallocate();
         }
+        double endTime = System.currentTimeMillis();
+        outputTable.putNumber("Time taken", endTime - startTime);
         return rawImage;
     }
     
@@ -399,6 +403,11 @@ extends WPICameraExtension {
         cvAnd(hueMinImg, bin, bin, null);
         
         opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, closings.getValue());
+        
+        hueMinImg.deallocate();
+        satMinImg.deallocate();
+        valMinImg.deallocate();
+        temp.deallocate();
         
         return StormExtensions.makeWPIBinaryImage(bin);
         
@@ -512,13 +521,13 @@ extends WPICameraExtension {
                 continue;
             }
             //System.out.println("");
-            System.out.println("Circumference: " + circumference + "\n" + 
+            /*System.out.println("Circumference: " + circumference + "\n" + 
                     "Area: " + polygonArea + "\n" + 
                     "Comparison: " + (circumference * circumference)/(4 * Math.PI * polygonArea) + "\n" + 
                     "Width of ball: " + x.getWidth() + "\n" + 
                     "Height of ball: " + x.getHeight() + "\n" +
                     "Width of image: " + imageWidth + "\n" + 
-                    "Height of image: " + imageHeight + "\n");
+                    "Height of image: " + imageHeight + "\n");*/
             
             if(poly.getNumVertices() >= vertices && ((x.getWidth()*x.getHeight())/(imageHeight*imageWidth))*100.0 < screenPercentage.getValue()){
                 continue;
@@ -614,5 +623,6 @@ extends WPICameraExtension {
             displayedImages.add(newImage);
             CanvasFrame result = new CanvasFrame(title);
             result.showImage(newImage.getBufferedImage());
+            newImage.deallocate();
         }
     }
