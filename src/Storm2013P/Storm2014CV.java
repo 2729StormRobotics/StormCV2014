@@ -40,8 +40,8 @@ import javax.imageio.ImageIO;
 
 
 public class Storm2014CV 
-//extends WPILaptopCameraExtension {
-extends WPICameraExtension {
+extends WPILaptopCameraExtension {
+//extends WPICameraExtension {
     
     public MultiProperty processing = new MultiProperty(this, "Process how far");
     
@@ -56,11 +56,11 @@ extends WPICameraExtension {
             cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
             screenPercentage = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
     public IntegerProperty 
-            hueMinCircle = new IntegerProperty(this, "Hue minimum value for circle", 85), //For red ball, 70, for red ball picture, 1
-            hueMaxCircle = new IntegerProperty(this, "Hue maximum value for circle", 130), //For red ball, 190, for red ball picture, 19
+            hueMinCircle = new IntegerProperty(this, "Hue minimum value for circle", 85), //For red ball, 125, for red ball picture, 1
+            hueMaxCircle = new IntegerProperty(this, "Hue maximum value for circle", 130), //For red ball, 170, for red ball picture, 19
             satMinCircle = new IntegerProperty(this, "Saturation minimum value for circle", 110), //For red ball, 90, for red ball picture, 200
             satMaxCircle = new IntegerProperty(this, "Saturation maximum value for circle", 185), //For red ball, 170, for red ball picture, 215
-            valMinCircle = new IntegerProperty(this, "Value minimum value for circle", 0), //For red ball, 80, for red ball picture, 78
+            valMinCircle = new IntegerProperty(this, "Value minimum value for circle", 0), //For red ball, 50, for red ball picture, 78
             valMaxCircle = new IntegerProperty(this, "Value maximum value for circle", 185), //For red ball, 230, for red ball picture, 200
             hueMinSquare = new IntegerProperty(this, "Hue minimum value for rectangle", 50),
             hueMaxSquare = new IntegerProperty(this, "Hue maximum value for rectangle", 90),
@@ -95,7 +95,7 @@ extends WPICameraExtension {
             
             ballPerimeterVArea      = new DoubleProperty(this, "Value for circumference over area of ball to be less than", 1.2), //for last year's target, use 0.9
     
-            ballPercentInPicture    = new DoubleProperty(this, "Percentage of screen that the ball width occupies", 108.0/321.0),
+            ballPercentInPicture    = new DoubleProperty(this, "Percentage of screen that the ball width occupies", 110.0/320.0),
             distance                = new DoubleProperty(this, "Distance from camera for above percentage in inches", 87.5);
     private IplImage bin;
     public boolean [] isVertical = new boolean [4];
@@ -200,7 +200,20 @@ extends WPICameraExtension {
                             
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
-                            double ballPercentInCamera = p.getWidth()/rawImage.getWidth();
+                            
+                            WPIPoint [] vertices = p.getPoints();
+                            double currentDistance;
+                            double maxDistance = 0.0;
+                            
+                            for(int j = 0; j<vertices.length - 1;j++){
+                                for(int k = j+1;k<vertices.length;k++){
+                                    currentDistance = distanceFormula(vertices[j].getX(), vertices[j].getY(), vertices[k].getX(), vertices[k].getY());
+                                    if(currentDistance > maxDistance)
+                                        maxDistance = currentDistance;
+                                }
+                            }
+                            
+                            double ballPercentInCamera = maxDistance/(double)rawImage.getWidth();
                             double distanceToBall = (ballPercentInPicture.getValue()/ballPercentInCamera) * distance.getValue();
                             
                             
@@ -247,7 +260,7 @@ extends WPICameraExtension {
                             WPIPoint [] points;
                             points = p.getPoints();
                             for(int j = 0;j<verticesRect.getValue().intValue();j++){
-                                sideLengths[j]=distanceForm(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
+                                sideLengths[j]=distanceFormula(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
                             }
 
                             double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
@@ -267,7 +280,7 @@ extends WPICameraExtension {
                             WPIPoint [] points;
                             points = p.getPoints();
                             for(int j = 0;j<verticesRect.getValue().intValue();j++){
-                                sideLengths[j]=distanceForm(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
+                                sideLengths[j]=distanceFormula(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
                             }
 
                             double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
@@ -469,8 +482,8 @@ extends WPICameraExtension {
     
     public boolean isVert(WPIPolygon p){
         WPIPoint[] points = p.getPoints();
-        double averageSide0 = ((distanceForm(points[0].getX(), points[0].getY(), points[1].getX(), points[1].getY())) + (distanceForm(points[2].getX(), points[2].getY(), points[3].getX(), points[3].getY())))/2;
-        double averageSide1 = ((distanceForm(points[1].getX(), points[1].getY(), points[2].getX(), points[2].getY())) + (distanceForm(points[3].getX(), points[3].getY(), points[0].getX(), points[0].getY())))/2;
+        double averageSide0 = ((distanceFormula(points[0].getX(), points[0].getY(), points[1].getX(), points[1].getY())) + (distanceFormula(points[2].getX(), points[2].getY(), points[3].getX(), points[3].getY())))/2;
+        double averageSide1 = ((distanceFormula(points[1].getX(), points[1].getY(), points[2].getX(), points[2].getY())) + (distanceFormula(points[3].getX(), points[3].getY(), points[0].getX(), points[0].getY())))/2;
         double aspectRatio;
         if(checkVert(points[0], points[1])){
             aspectRatio = averageSide1/averageSide0;    
@@ -519,7 +532,7 @@ extends WPICameraExtension {
         return polygons;
     }
     
-    public static double distanceForm(double x1, double y1, double x2, double y2){
+    public static double distanceFormula(double x1, double y1, double x2, double y2){
         return (Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
     }
        
