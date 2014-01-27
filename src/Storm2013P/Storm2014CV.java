@@ -17,7 +17,6 @@ import edu.wpi.first.wpijavacv.WPIPolygon;
 import com.googlecode.javacv.cpp.opencv_imgproc;
 import com.googlecode.javacv.cpp.opencv_imgproc.*;
 import edu.wpi.first.smartdashboard.camera.WPILaptopCameraExtension;
-import edu.wpi.first.smartdashboard.gui.elements.Label;
 import edu.wpi.first.smartdashboard.properties.BooleanProperty;
 import edu.wpi.first.smartdashboard.properties.ColorProperty;
 import edu.wpi.first.smartdashboard.properties.DoubleProperty;
@@ -25,16 +24,9 @@ import edu.wpi.first.wpijavacv.StormExtensions;
 import edu.wpi.first.wpijavacv.WPIColor;
 import edu.wpi.first.wpijavacv.WPIPoint;
 import java.awt.Color;
-import java.io.FileNotFoundException;
-import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.swing.JDialog;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.smartdashboard.robot.Robot;
-import java.awt.Image;
 import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
@@ -56,7 +48,7 @@ extends WPICameraExtension {
 
 
     public enum processingSteps{
-        doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, perimVArea, everything
+        doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, everything
     }
     
     public DoubleProperty  
@@ -93,18 +85,18 @@ extends WPICameraExtension {
     public BooleanProperty imageTest = new BooleanProperty(this, "Test with image?", false);
     
     public DoubleProperty
-            distance = new DoubleProperty(this, "Target radius of circle", .2),
-            range = new DoubleProperty(this, "Margin between target and actual radii", 0),
             percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 10),
             percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 10),
             
-            verticalTargetRatio = new DoubleProperty(this, "Ratio of vertical target, b:h", 0.125), //for last year's target, use 0.5
-            verticalTargetMargin = new DoubleProperty(this, "Margin for vertical ratio", .04), //for last year's target, use 0.3
-            horizontalTargetRatio = new DoubleProperty(this, "Ratio of horizontal target, b:h", 5.875), //for last year's target, use 2.0
-            horizontalTargetMargin = new DoubleProperty(this, "Margin for horizontal ratio", .3), //for last year's target, use 0.9
+            verticalTargetRatio     = new DoubleProperty(this, "Ratio of vertical target, b:h", 0.125), //for last year's target, use 0.5
+            verticalTargetMargin    = new DoubleProperty(this, "Margin for vertical ratio", .04), //for last year's target, use 0.3
+            horizontalTargetRatio   = new DoubleProperty(this, "Ratio of horizontal target, b:h", 5.875), //for last year's target, use 2.0
+            horizontalTargetMargin  = new DoubleProperty(this, "Margin for horizontal ratio", .3), //for last year's target, use 0.9
             
-            ballPerimeterVArea = new DoubleProperty(this, "Value for circumference over area of ball to be less than", 1.2); //for last year's target, use 0.9
+            ballPerimeterVArea      = new DoubleProperty(this, "Value for circumference over area of ball to be less than", 1.2), //for last year's target, use 0.9
     
+            ballPercentInPicture    = new DoubleProperty(this, "Percentage of screen that the ball width occupies", 108.0/321.0),
+            distance                = new DoubleProperty(this, "Distance from camera for above percentage in inches", 87.5);
     private IplImage bin;
     public boolean [] isVertical = new boolean [4];
     
@@ -120,7 +112,6 @@ extends WPICameraExtension {
         processing.add("Nothing", processingSteps.doNothing);
         processing.add("Contour Ball", processingSteps.contoursBall);
         processing.add("Contour Target", processingSteps.contoursTarget);
-        processing.add("Only compare Perimeter to Area", processingSteps.perimVArea);
         processing.add("Everything", processingSteps.everything);
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
@@ -169,7 +160,7 @@ extends WPICameraExtension {
                     } else {
                         StormExtensions.copyImage(ret, thresholdIPL);
                     }
-
+                    
                     return ret;
                 }
             }else{
@@ -196,25 +187,26 @@ extends WPICameraExtension {
                 if(countours.length != 0){
                     checkedPolygons = findCircle(countours, verticesCirc.getValue());
                     if(checkedPolygons != null && checkedPolygons.length !=0){
-
-                        for(int x = 0;x<checkedPolygons.length;x++){
-
+                        
+                        for (WPIPolygon p : checkedPolygons) {
+                            
                             double centerX, centerY, YPos, XPos, YAngle, XAngle;
-                            WPIPolygon y = checkedPolygons[x];
-
-                            centerX = y.getX() + (y.getWidth()/2);
-                            centerY = y.getY() + (y.getHeight()/2);
-
+                            
+                            centerX = p.getX() + (p.getWidth()/2);
+                            centerY = p.getY() + (p.getHeight()/2);
+                            
                             XPos = (2*centerX)/rawImage.getWidth() - 1;
                             YPos = (2*centerY)/rawImage.getHeight() - 1;
-
+                            
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
-
-                            outputTable.putNumber("Ball X position", XPos);
-                            outputTable.putNumber("Ball Y position", YPos);
-                            outputTable.putNumber("Ball horizontal angle", XAngle);
-                            outputTable.putNumber("Ball vertical angle", YAngle);
+                            double ballPercentInCamera = p.getWidth()/rawImage.getWidth();
+                            double distanceToBall = (ballPercentInPicture.getValue()/ballPercentInCamera) * distance.getValue();
+                            
+                            
+                            outputTable.putNumber("Ball horizontal angle to center", XAngle);
+                            outputTable.putNumber("Ball vertical angle to center", YAngle);
+                            outputTable.putNumber("Distance to ball in inches", distanceToBall);
                             outputTable.putBoolean("Found ball", true);
                         }
 
@@ -246,7 +238,7 @@ extends WPICameraExtension {
                         
                         ArrayList<WPIPolygon> finalVertical = new ArrayList<>();
                         ArrayList<WPIPolygon> finalHorizontal = new ArrayList<>();
-                        System.out.println("tic-toc");
+                        //System.out.println("tic-toc");
                         for(WPIPolygon p : verticalRectangleList){
                             
                             double [] sideLengths = new double[verticesRect.getValue().intValue()];
@@ -305,20 +297,19 @@ extends WPICameraExtension {
                             
                             WPIPolygon y = finalVertical.get(j);
                             double centerX, centerY, YPos, XPos, YAngle, XAngle;
-
+                            
                             centerX = y.getX() + (y.getWidth()/2);
                             centerY = y.getY() + (y.getHeight()/2);
-
+                            
                             XPos = (2*centerX)/rawImage.getWidth() - 1;
                             YPos = (2*centerY)/rawImage.getHeight() - 1;
-
+                            
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
-
-                            outputTable.putNumber("Vertical target X position", XPos);
-                            outputTable.putNumber("Vertical target Y position", YPos);
+                            
                             outputTable.putNumber("Vertical target horizontal angle", XAngle);
                             outputTable.putNumber("Vertical target vertical angle", YAngle);
+                            outputTable.putBoolean("Found horizontal target", true);
                             
                             
                             
@@ -331,19 +322,16 @@ extends WPICameraExtension {
 
                             centerX = y.getX() + (y.getWidth()/2);
                             centerY = y.getY() + (y.getHeight()/2);
-
+                            
                             XPos = (2*centerX)/rawImage.getWidth() - 1;
                             YPos = (2*centerY)/rawImage.getHeight() - 1;
-
+                            
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
-
-                            outputTable.putNumber("Horizontal target X position", XPos);
-                            outputTable.putNumber("Horizontal target Y position", YPos);
+                            
                             outputTable.putNumber("Horizontal target horizontal angle", XAngle);
                             outputTable.putNumber("Horizontal target vertical angle", YAngle);
                             outputTable.putBoolean("Found horizontal target", true);
-                            
                             
                             horizontalRectangle[j] = y;
                         }
@@ -351,15 +339,16 @@ extends WPICameraExtension {
                         rawImage.drawPolygons(verticalRectangle, wpiVerticalColorProp, width.getValue());
                         rawImage.drawPolygons(horizontalRectangle, wpiHorizontalColorProp, width.getValue());
 
-                    }else{
-                        outputTable.putBoolean("Found target(s) ", false);
                     }
+                }else{
+                    outputTable.putBoolean("Found vertical target", false);
+                    outputTable.putBoolean("Found horizontal target", false);
                 }
             }
             thresholdIPL.deallocate();
         }
         double endTime = System.currentTimeMillis();
-        outputTable.putNumber("Time taken", endTime - startTime);
+        outputTable.putNumber("Time taken in milliseconds", endTime - startTime);
         return rawImage;
     }
     
@@ -416,11 +405,11 @@ extends WPICameraExtension {
     public WPIPolygon[] checkPolygons(WPIContour[] countours, int vertices) {
         
         //System.out.println("Got in well enough");
-        ArrayList<WPIPolygon> polygons = new ArrayList<WPIPolygon>();
-        ArrayList<WPIPolygon> rectangles = new ArrayList<WPIPolygon>();
+        ArrayList<WPIPolygon> polygons = new ArrayList<>();
+        ArrayList<WPIPolygon> rectangles = new ArrayList<>();
         WPIPolygon [] rects;
         
-        ArrayList<WPIPolygon> checkedPolygons = new ArrayList<WPIPolygon>();
+        ArrayList<WPIPolygon> checkedPolygons = new ArrayList<>();
                 
         for(WPIContour c:countours){
             
@@ -428,8 +417,8 @@ extends WPICameraExtension {
             
             polygons.add(c.approxPolygon(percentAccRect.getValue()));
                 
-                
             for(int y = 0; y < polygons.size(); y++){
+                
                 int centerX, centerY, YPos, XPos;
                 
                 WPIPolygon p = polygons.get(y);
@@ -437,7 +426,6 @@ extends WPICameraExtension {
                 double aspectRatio;
                 WPIPoint [] points;
                 boolean orderChecks = true;
-                //System.out.println(p.isConvex() + "   " + p.getNumVertices() + "   " + vertices);
                 if(!p.isConvex() || p.getNumVertices() != vertices){
                     continue;
                 }
@@ -446,12 +434,7 @@ extends WPICameraExtension {
                 //System.out.println(vertices);
 
                 for(int x = 0; x< vertices;x++){
-                    if(checkVert(points[x], points[(x+1) % vertices])){
-                        isVertical[x] = true;
-                    }else{
-                        isVertical[x] = false;
-                    }
-
+                    isVertical[x] = checkVert(points[x], points[(x+1) % vertices]);
                 }
 
                 if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3]) || (!isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
@@ -459,9 +442,6 @@ extends WPICameraExtension {
                     //System.out.println("Failed side order check");
                 }
                 
-
-                
-
                 if(orderChecks){
                     checkedPolygons.add(p);
                 }
@@ -472,7 +452,7 @@ extends WPICameraExtension {
     
             
         }
-        if(checkedPolygons.size() != 0){
+        if(!checkedPolygons.isEmpty()){
             rects = new WPIPolygon[checkedPolygons.size()];
             for(int i =0;i<checkedPolygons.size();i++){
                 rects[i]=checkedPolygons.get(i);
@@ -497,14 +477,8 @@ extends WPICameraExtension {
         }else{
             aspectRatio = averageSide0/averageSide1;
         }
-        //System.out.println(aspectRatio);
-        if(aspectRatio <= 1){
-            return true;
-        }else{
-            return false;
-        }
+        return aspectRatio <= 1;
     }
-    
     
     public boolean checkVert(WPIPoint x1, WPIPoint x2){
         //System.out.println(Math.abs(x2.getY()-x1.getY()) > (Math.abs(x2.getX()-x1.getX())));
@@ -512,7 +486,7 @@ extends WPICameraExtension {
     }
     
     public WPIPolygon[] findCircle(WPIContour[] contours, int vertices){
-        ArrayList<WPIPolygon> circleChecked = new ArrayList<WPIPolygon> ();
+        ArrayList<WPIPolygon> circleChecked = new ArrayList<> ();
         for(WPIContour x: contours){       
             WPIPolygon poly = x.approxPolygon(percentAccCircle.getValue());
             double polygonArea = poly.getArea();
@@ -538,91 +512,57 @@ extends WPICameraExtension {
             
         }
         
-        if(processing.getValue() == processingSteps.perimVArea){
-            WPIPolygon[] ret = new WPIPolygon[circleChecked.size()];
-            for(int i = 0;i<ret.length;i++){
-                ret[i] = circleChecked.get(i);
-            }
-            return ret;
+        WPIPolygon[] polygons = new WPIPolygon[circleChecked.size()];
+        for(int i = 0;i<polygons.length;i++){
+            polygons[i] = circleChecked.get(i);
         }
-        for(int x=0;x<circleChecked.size();x++){
-            boolean notCircle=false;
-            double xAverage = 0, yAverage = 0;
-            for(int y=0;y<circleChecked.get(x).getPoints().length;y++){
-                xAverage+=circleChecked.get(x).getPoints()[y].getX();
-                yAverage+=circleChecked.get(x).getPoints()[y].getY();
-            }
-            xAverage /= circleChecked.get(x).getPoints().length;
-            yAverage /= circleChecked.get(x).getPoints().length;
-            for(int y=0;y<circleChecked.get(x).getPoints().length;y++){
-                double radius = distanceForm(xAverage, yAverage, circleChecked.get(x).getPoints()[y].getX(), circleChecked.get(x).getPoints()[y].getY());
-                if(!(Math.abs((radius/distance.getValue()) - 1) <= range.getValue())){
-                    notCircle = true;
-                }
-            }
-            if(!notCircle){
-                circleChecked.remove(x);
-            }
-        }
+        return polygons;
+    }
+    
+    public static double distanceForm(double x1, double y1, double x2, double y2){
+        return (Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
+    }
        
-       
-       if(circleChecked.size() != 0){
-            WPIPolygon [] circles = new WPIPolygon[circleChecked.size()];
+    public static void main(String[] args){
         
-            for(int x = 0; x < circleChecked.size();x++){
-                circles[x] = circleChecked.get(x);
-            }
-        //System.out.println("Found polygon(s)");
-        return circles;
-        }
-       return null;
-    }
-       public static double distanceForm(double x1, double y1, double x2, double y2){
-           return (Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
-       }
+        Storm2014CV cv = new Storm2014CV();
        
-       public static void main(String[] args){
-           
-           Storm2014CV cv = new Storm2014CV();
-           
-           Scanner scanner = new Scanner(System.in);
-           if(args.length == 0){
-               System.out.println("Put in filenames seperated by spaces");
-               System.exit(0);
-           }
-           for(int x = 0; x<args.length; x++){
-               String filename = args[x];
+        Scanner scanner = new Scanner(System.in);
+        if(args.length == 0){
+            System.out.println("Put in filenames seperated by spaces");
+            System.exit(0);
+        }
+        for (String filename : args) {
+            System.out.println(filename + ": ");
                
-               System.out.println(filename + ": ");
+            WPIColorImage rawImage;
                
-               WPIColorImage rawImage;
-               
-               try {
-                  rawImage = new WPIColorImage(ImageIO.read(new File(filename)));
-               } catch (IOException e) {
-                  System.err.println("Could not find file!");
-                  return;
+            try {
+                rawImage = new WPIColorImage(ImageIO.read(new File(filename)));
+            } catch (IOException e) {
+                System.err.println("Could not find file!");
+                return;
             }
                
-               WPIImage result;
+            WPIImage result;
                
-               cv.processing.setValue(processingSteps.everything);
-               result = cv.processImage(rawImage);
+            cv.processing.setValue(processingSteps.everything);
+            result = cv.processImage(rawImage);
+            
+            cv.displayImage("Result: " + filename, StormExtensions.getIplImage(result));
                
-               cv.displayImage("Result: " + filename, StormExtensions.getIplImage(result));
+            System.out.println("Enter continues");
                
-               System.out.println("Enter continues");
-               
-               scanner.nextLine();
-           }
-       }
-       
-       public void displayImage(String title,IplImage image) {
-            IplImage newImage = IplImage.create(image.cvSize(), image.depth(), image.nChannels());
-            cvCopy(image, newImage);
-            displayedImages.add(newImage);
-            CanvasFrame result = new CanvasFrame(title);
-            result.showImage(newImage.getBufferedImage());
-            newImage.deallocate();
+            scanner.nextLine();
         }
     }
+       
+    public void displayImage(String title,IplImage image) {
+         IplImage newImage = IplImage.create(image.cvSize(), image.depth(), image.nChannels());
+         cvCopy(image, newImage);
+         displayedImages.add(newImage);
+         CanvasFrame result = new CanvasFrame(title);
+         result.showImage(newImage.getBufferedImage());
+         newImage.deallocate();
+    }
+}
