@@ -516,7 +516,7 @@ extends WPILaptopCameraExtension {
                     "Width of image: " + imageWidth + "\n" + 
                     "Height of image: " + imageHeight + "\n");*/
             
-            if(poly.getNumVertices() >= vertices && ((x.getWidth()*x.getHeight())/(imageHeight*imageWidth))*100.0 < screenPercentage.getValue()){
+            if(poly.getNumVertices() < vertices || ((x.getWidth()*x.getHeight())/(imageHeight*imageWidth))*100.0 < screenPercentage.getValue()){
                 continue;
             }
             if(((circumference * circumference)/(4 * Math.PI * polygonArea) < ballPerimeterVArea.getValue())){
