@@ -44,11 +44,16 @@ extends WPILaptopCameraExtension {
 //extends WPICameraExtension {
     
     public MultiProperty processing = new MultiProperty(this, "Process how far");
+    public MultiProperty selection = new MultiProperty(this, "Select which ball?");
     
 
 
     public enum processingSteps{
         doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, everything
+    }
+    
+    public enum selectionSteps{
+        closest, farthest, biggest
     }
     
     public DoubleProperty  
@@ -106,6 +111,10 @@ extends WPILaptopCameraExtension {
     
     public double imageWidth, imageHeight;
     
+    public WPIPolygon largest, farthest, closest;
+    
+    public double longestRadius = 0.0, longestDistance = 0.0, shortestDistance = 10000.0, distanceToLargestRadius = 0.0;
+    
     public Storm2014CV() {
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
@@ -113,6 +122,13 @@ extends WPILaptopCameraExtension {
         processing.add("Contour Ball", processingSteps.contoursBall);
         processing.add("Contour Target", processingSteps.contoursTarget);
         processing.add("Everything", processingSteps.everything);
+        processing.setDefault("Everything");
+        
+        selection.add("Closest ball", selectionSteps.closest);
+        selection.add("Farthest ball", selectionSteps.farthest);
+        selection.add("Largest ball", selectionSteps.biggest);
+        selection.setDefault("Closest ball");
+        
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
         } catch (FileNotFoundException ex) {
@@ -190,17 +206,6 @@ extends WPILaptopCameraExtension {
                         
                         for (WPIPolygon p : checkedPolygons) {
                             
-                            double centerX, centerY, YPos, XPos, YAngle, XAngle;
-                            
-                            centerX = p.getX() + (p.getWidth()/2);
-                            centerY = p.getY() + (p.getHeight()/2);
-                            
-                            XPos = (2*centerX)/rawImage.getWidth() - 1;
-                            YPos = (2*centerY)/rawImage.getHeight() - 1;
-                            
-                            YAngle = YPos * (cameraYAngle.getValue()/2);
-                            XAngle = XPos * (cameraXAngle.getValue()/2);
-                            
                             WPIPoint [] vertices = p.getPoints();
                             double currentDistance;
                             double maxDistance = 0.0;
@@ -210,20 +215,46 @@ extends WPILaptopCameraExtension {
                                     currentDistance = distanceFormula(vertices[j].getX(), vertices[j].getY(), vertices[k].getX(), vertices[k].getY());
                                     if(currentDistance > maxDistance)
                                         maxDistance = currentDistance;
+                                    
                                 }
                             }
                             
                             double ballPercentInCamera = maxDistance/(double)rawImage.getWidth();
                             double distanceToBall = (ballPercentInPicture.getValue()/ballPercentInCamera) * distance.getValue();
                             
-                            
-                            outputTable.putNumber("Ball horizontal angle to center", XAngle);
-                            outputTable.putNumber("Ball vertical angle to center", YAngle);
-                            outputTable.putNumber("Distance to ball in inches", distanceToBall);
-                            outputTable.putBoolean("Found ball", true);
+                            if(maxDistance > longestRadius){
+                                longestRadius = maxDistance;
+                                largest = p;
+                                distanceToLargestRadius = distanceToBall;
+                            }
+                            if(distanceToBall > longestDistance){
+                                longestDistance = distanceToBall;
+                                farthest = p;
+                            }
+                            if(distanceToBall < shortestDistance){
+                                shortestDistance = distanceToBall;
+                                closest = p;
+                            }
                         }
-
-                        rawImage.drawPolygons(checkedPolygons, wpiCircleColorProp, width.getValue());
+                        WPIPolygon finalBall = closest;
+                        double distanceToBall = shortestDistance, XAngle, YAngle;
+                        if(selection.getValue() == selectionSteps.farthest){
+                            finalBall = farthest;
+                            distanceToBall = longestDistance;
+                        }
+                        if(selection.getValue() == selectionSteps.biggest){
+                            distanceToBall = distanceToLargestRadius;
+                            finalBall = largest;
+                        }
+                        
+                        YAngle = ((2*(finalBall.getY() + (finalBall.getHeight()/2)))/rawImage.getHeight() - 1) * (cameraYAngle.getValue()/2);
+                        XAngle = ((2*(finalBall.getX() + (finalBall.getWidth()/2)))/rawImage.getWidth() - 1) * (cameraXAngle.getValue()/2);
+                        
+                        outputTable.putNumber("Ball horizontal angle to center", XAngle);
+                        outputTable.putNumber("Ball vertical angle to center", YAngle);
+                        outputTable.putNumber("Distance to ball in inches", distanceToBall);
+                        outputTable.putBoolean("Found ball", true);
+                        rawImage.drawPolygon(finalBall, wpiCircleColorProp, width.getValue());
 
                     }else{
                         outputTable.putBoolean("Found ball", false);
