@@ -49,7 +49,7 @@ extends WPILaptopCameraExtension {
 
 
     public enum processingSteps{
-        doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, everything
+        doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, polygonApproxBall, polygonApproxTarget, everything
     }
     
     public enum selectionSteps{
@@ -121,6 +121,8 @@ extends WPILaptopCameraExtension {
         processing.add("Nothing", processingSteps.doNothing);
         processing.add("Contour Ball", processingSteps.contoursBall);
         processing.add("Contour Target", processingSteps.contoursTarget);
+        processing.add("Approximate ball polygons", processingSteps.polygonApproxBall);
+        processing.add("Approximate target polygons", processingSteps.polygonApproxTarget);
         processing.add("Everything", processingSteps.everything);
         processing.setDefault("Everything");
         
@@ -159,7 +161,7 @@ extends WPILaptopCameraExtension {
         
         for(int i = 0;i<2;i++){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
             WPIBinaryImage thresholds;
-            WPIContour [] countours;
+            WPIContour [] contours;
             WPIPolygon [] checkedPolygons;
             WPIColor wpiCircleColorProp = new WPIColor(circleColorProp.getValue());
             WPIColor wpiHorizontalColorProp = new WPIColor(horizontalColorProp.getValue());
@@ -194,14 +196,24 @@ extends WPILaptopCameraExtension {
                 }
             }
             
-            countours = StormExtensions.findConvexContours(thresholds);
+            contours = StormExtensions.findConvexContours(thresholds);
 
-            if(processing.getValue() == processingSteps.contoursBall && i == 0){rawImage.drawContours(countours, wpiCircleColorProp, width.getValue());return rawImage;
-            }else{if(processing.getValue() == processingSteps.contoursTarget && i == 1){rawImage.drawContours(countours, wpiCircleColorProp, width.getValue());return rawImage;}}
+            if(processing.getValue() == processingSteps.contoursBall && i == 0){rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());return rawImage;
+            }else{if(processing.getValue() == processingSteps.contoursTarget && i == 1){rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());return rawImage;}}
             
             if(i == 0){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
-                if(countours.length != 0){
-                    checkedPolygons = findCircle(countours, verticesCirc.getValue());
+                if(contours.length != 0){
+                    
+                    if(processing.getValue() == processingSteps.polygonApproxBall){
+                        WPIPolygon [] returnBalls = new WPIPolygon[contours.length];
+                        for(int k = 0;k<returnBalls.length;k++){
+                            returnBalls[k] = contours[k].approxPolygon(percentAccCircle.getValue());
+                        }
+                        rawImage.drawPolygons(returnBalls, wpiCircleColorProp, width.getValue());
+                        return rawImage;
+                    }
+                    
+                    checkedPolygons = findCircle(contours, verticesCirc.getValue());
                     if(checkedPolygons != null && checkedPolygons.length !=0){
                         
                         for (WPIPolygon p : checkedPolygons) {
@@ -261,8 +273,18 @@ extends WPILaptopCameraExtension {
                     }
                 }
             }else{
-                if(countours.length != 0){
-                    checkedPolygons = checkPolygons(countours, verticesRect.getValue().intValue());
+                if(contours.length != 0){
+                    
+                    if(processing.getValue() == processingSteps.polygonApproxTarget){
+                        WPIPolygon [] returnTargets = new WPIPolygon[contours.length];
+                        for(int k = 0;k<returnTargets.length;k++){
+                            returnTargets[k] = contours[k].approxPolygon(percentAccRect.getValue());
+                        }
+                        rawImage.drawPolygons(returnTargets, wpiCircleColorProp, width.getValue());
+                        return rawImage;
+                    }
+                    
+                    checkedPolygons = checkPolygons(contours, verticesRect.getValue().intValue());
                     if(checkedPolygons != null && checkedPolygons.length !=0){
 
                         ArrayList<WPIPolygon> horizontalRectangleList = new ArrayList<>();
