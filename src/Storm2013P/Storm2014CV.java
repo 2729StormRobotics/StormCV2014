@@ -6,6 +6,7 @@ package Storm2013P;
 import com.googlecode.javacv.CanvasFrame;
 import static com.googlecode.javacv.cpp.opencv_core.*;
 import static com.googlecode.javacv.cpp.opencv_imgproc.*;
+import com.googlecode.javacv.cpp.opencv_core.CvSize;
 import edu.wpi.first.smartdashboard.camera.WPICameraExtension;
 import edu.wpi.first.smartdashboard.properties.IntegerProperty;
 import edu.wpi.first.wpijavacv.WPIColorImage;
@@ -107,7 +108,15 @@ extends WPICameraExtension {
     
             ballPercentInPicture    = new DoubleProperty(this, "Percentage of screen that the ball width occupies", 110.0/320.0),
             distance                = new DoubleProperty(this, "Distance from camera for above percentage in inches", 87.5);
+    
     private IplImage bin;
+    private IplImage hueImg;
+    private IplImage satImg;
+    private IplImage valImg;
+    private IplImage temp;
+    private CvSize size;
+    private IplImage hsv;
+    
     public boolean [] isVertical    = new boolean [4];
     
     public ArrayList<IplImage> displayedImages = new ArrayList<>();
@@ -176,6 +185,17 @@ extends WPICameraExtension {
             WPIColor wpiVerticalColorProp = new WPIColor(verticalColorProp.getValue());
             IplImage thresholdIPL;
             //System.out.println("tic");
+            
+            if(size == null || size.width() != rawImage.getWidth() || size.height() != rawImage.getHeight()) {
+                size    = cvSize(rawImage.getWidth(),rawImage.getHeight());
+                hsv     = IplImage.create(size, 8, 3);
+                bin     = IplImage.create(size, 8, 1);
+                hueImg  = IplImage.create(size, 8, 1);
+                satImg  = IplImage.create(size, 8, 1);
+                valImg  = IplImage.create(size, 8, 1);
+            }
+            
+            
             if(i==0){
                 thresholds = findThresholds(rawImage, hueMinCircle.getValue(), hueMaxCircle.getValue(), satMinCircle.getValue(), satMaxCircle.getValue(), valMinCircle.getValue(), valMaxCircle.getValue(), closingsForBall.getValue());
                 thresholdIPL = StormExtensions.getIplImage(thresholds);
@@ -355,7 +375,7 @@ extends WPICameraExtension {
                             
                             double aspectRatio = averageSide2/averageSide1;
                             //System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
-                            if(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < verticalTargetMargin.getValue().doubleValue()){
+                            if(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < verticalTargetMargin.getValue()){
                                 finalVertical.add(p);
                             }else{
                                 //System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
@@ -378,7 +398,7 @@ extends WPICameraExtension {
                             double aspectRatio = averageSide2/averageSide1;
                             //System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
                             
-                            if(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < horizontalTargetMargin.getValue().doubleValue()){
+                            if(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < horizontalTargetMargin.getValue()){
                                 finalHorizontal.add(p);
                             }else{
                                 //System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
@@ -393,6 +413,7 @@ extends WPICameraExtension {
                         if(verticalRectangle.length == 0){
                             outputTable.putBoolean("Found vertical target", false);
                         }
+             
                         for(int j = 0; j<finalVertical.size();j++){
                             
                             WPIPolygon y = finalVertical.get(j);
@@ -456,49 +477,36 @@ extends WPICameraExtension {
     }
     
     public WPIBinaryImage findThresholds(WPIColorImage rawImage, Integer hueMin, Integer hueMax, Integer satMin, Integer satMax, Integer valMin, Integer valMax, Integer closings) {
-        
-        IplImage hueMinImg;
-        IplImage satMinImg;
-        IplImage valMinImg;
-        IplImage temp;
+
         IplConvKernel morphKernel;
         morphKernel = IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);
         
-        hueMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        satMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        valMinImg = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        bin = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        temp = IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 1);
-        
         IplImage camIn = StormExtensions.getIplImage(rawImage);
-        IplImage hsv =IplImage.create(cvSize(rawImage.getWidth(), rawImage.getHeight()), 8, 3);
-        opencv_imgproc.cvCvtColor(camIn, hsv, opencv_imgproc.CV_BGR2HSV);
-        cvSplit(hsv, hueMinImg, satMinImg, valMinImg, null);
+        cvCvtColor(camIn, hsv, opencv_imgproc.CV_BGR2HSV);
         
-        opencv_imgproc.cvThreshold(hueMinImg, bin, hueMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
-        opencv_imgproc.cvThreshold(hueMinImg, temp, hueMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
+        cvSplit(hsv, hueImg, satImg, valImg, null);
         
-        cvAnd(temp, bin, hueMinImg, null);
+        opencv_imgproc.cvThreshold(hueImg, bin, hueMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
+        opencv_imgproc.cvThreshold(hueImg, temp, hueMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
-        opencv_imgproc.cvThreshold(satMinImg, bin, satMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
-        opencv_imgproc.cvThreshold(satMinImg, temp, satMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
+        cvAnd(temp, bin, hueImg, null);
         
-        cvAnd(temp, bin, satMinImg, null);
+        opencv_imgproc.cvThreshold(satImg, bin, satMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
+        opencv_imgproc.cvThreshold(satImg, temp, satMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
+        
+        cvAnd(temp, bin, satImg, null);
                 
-        opencv_imgproc.cvThreshold(valMinImg, bin, valMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
-        opencv_imgproc.cvThreshold(valMinImg, temp, valMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
+        opencv_imgproc.cvThreshold(valImg, bin, valMin - 1, 255, opencv_imgproc.CV_THRESH_BINARY);
+        opencv_imgproc.cvThreshold(valImg, temp, valMax, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
         cvAnd(temp, bin, bin, null);
         
-        cvAnd(satMinImg, bin, bin, null);
-        cvAnd(hueMinImg, bin, bin, null);
+        cvAnd(satImg, bin, bin, null);
+        cvAnd(hueImg, bin, bin, null);
         
         opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, closings);
         
-        hueMinImg.deallocate();
-        satMinImg.deallocate();
-        valMinImg.deallocate();
-        temp.deallocate();
+        camIn.deallocate();
         
         return StormExtensions.makeWPIBinaryImage(bin);
         
