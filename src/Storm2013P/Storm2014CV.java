@@ -28,8 +28,12 @@ import java.util.ArrayList;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.smartdashboard.robot.Robot;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 
 /**
@@ -40,8 +44,8 @@ import javax.imageio.ImageIO;
 
 
 public class Storm2014CV 
-extends WPILaptopCameraExtension {
-//extends WPICameraExtension {
+//extends WPILaptopCameraExtension {
+extends WPICameraExtension {
     
     public MultiProperty processing = new MultiProperty(this, "Process how far");
     public MultiProperty selection = new MultiProperty(this, "Select which ball?");
@@ -49,7 +53,7 @@ extends WPILaptopCameraExtension {
 
 
     public enum processingSteps{
-        doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, polygonApproxBall, polygonApproxTarget, everything
+        doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, polygonApproxBall, polygonApproxTarget, checkCheckedPolygons, showVerticalRects, showHorizontalRects, everything, checkCheckedTargetPolygons
     }
     
     public enum selectionSteps{
@@ -57,30 +61,31 @@ extends WPILaptopCameraExtension {
     }
     
     public DoubleProperty  
-            cameraXAngle = new DoubleProperty(this, "Camera horizontal FOV angle", 47),
-            cameraYAngle = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
-            screenPercentage = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
-    public IntegerProperty 
-            hueMinCircle = new IntegerProperty(this, "Hue minimum value for circle", 85), //For red ball, 125, for red ball picture, 1
-            hueMaxCircle = new IntegerProperty(this, "Hue maximum value for circle", 130), //For red ball, 170, for red ball picture, 19
-            satMinCircle = new IntegerProperty(this, "Saturation minimum value for circle", 110), //For red ball, 90, for red ball picture, 200
-            satMaxCircle = new IntegerProperty(this, "Saturation maximum value for circle", 185), //For red ball, 170, for red ball picture, 215
-            valMinCircle = new IntegerProperty(this, "Value minimum value for circle", 0), //For red ball, 50, for red ball picture, 78
-            valMaxCircle = new IntegerProperty(this, "Value maximum value for circle", 185), //For red ball, 230, for red ball picture, 200
-            hueMinSquare = new IntegerProperty(this, "Hue minimum value for rectangle", 50),
-            hueMaxSquare = new IntegerProperty(this, "Hue maximum value for rectangle", 90),
-            satMinSquare = new IntegerProperty(this, "Saturation minimum value for rectangle", 220),
-            satMaxSquare = new IntegerProperty(this, "Saturation maximum value for rectangle", 255),
-            valMinSquare = new IntegerProperty(this, "Value minimum value for rectangle", 60),
-            valMaxSquare = new IntegerProperty(this, "Value maximum value for rectangle", 255),
-            closings     = new IntegerProperty(this, "Closing iterations", 2),
-            width        = new IntegerProperty(this, "Contour width", 5),
-            verticesCirc = new IntegerProperty(this, "Number of ball vertices", 8),
-            verticesRect = new IntegerProperty(this, "Number of target vertices", 4);
-    public ColorProperty 
-            circleColorProp = new ColorProperty(this, "Contour color for the ball", Color.BLACK),
-            horizontalColorProp = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
-            verticalColorProp = new ColorProperty(this, "Contour color for the vertical target", Color.CYAN);
+            cameraXAngle          = new DoubleProperty(this, "Camera horizontal FOV angle", 47),
+            cameraYAngle          = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
+            screenPercentage      = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
+    public IntegerProperty        
+            hueMinCircle          = new IntegerProperty(this, "Hue minimum value for circle", 85), //For red ball, 125, for red ball picture, 1
+            hueMaxCircle          = new IntegerProperty(this, "Hue maximum value for circle", 130), //For red ball, 170, for red ball picture, 19
+            satMinCircle          = new IntegerProperty(this, "Saturation minimum value for circle", 110), //For red ball, 90, for red ball picture, 200
+            satMaxCircle          = new IntegerProperty(this, "Saturation maximum value for circle", 185), //For red ball, 170, for red ball picture, 215
+            valMinCircle          = new IntegerProperty(this, "Value minimum value for circle", 0), //For red ball, 50, for red ball picture, 78
+            valMaxCircle          = new IntegerProperty(this, "Value maximum value for circle", 185), //For red ball, 230, for red ball picture, 200
+            hueMinSquare          = new IntegerProperty(this, "Hue minimum value for rectangle", 50), //For picture: 75
+            hueMaxSquare          = new IntegerProperty(this, "Hue maximum value for rectangle", 90), //For picture: 100
+            satMinSquare          = new IntegerProperty(this, "Saturation minimum value for rectangle", 220),//for picture: 10
+            satMaxSquare          = new IntegerProperty(this, "Saturation maximum value for rectangle", 255),//for picture: 70
+            valMinSquare          = new IntegerProperty(this, "Value minimum value for rectangle", 60),//for picture: 210
+            valMaxSquare          = new IntegerProperty(this, "Value maximum value for rectangle", 255),//for picture: 255
+            closingsForBall       = new IntegerProperty(this, "Closing iterations for ball", 2),
+            closingsForTarget     = new IntegerProperty(this, "Closing iterations for target", 0),
+            width                 = new IntegerProperty(this, "Contour width", 5),
+            verticesCirc          = new IntegerProperty(this, "Number of ball vertices", 8),
+            verticesRect          = new IntegerProperty(this, "Number of target vertices", 4);
+    public ColorProperty          
+            circleColorProp       = new ColorProperty(this, "Contour color for the ball", Color.BLACK),
+            horizontalColorProp   = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
+            verticalColorProp     = new ColorProperty(this, "Contour color for the vertical target", Color.CYAN);
     //public IplConvKernel morphologyKernel;
             
     private WPIImage ret;
@@ -95,15 +100,15 @@ extends WPILaptopCameraExtension {
             
             verticalTargetRatio     = new DoubleProperty(this, "Ratio of vertical target, b:h", 0.125), //for last year's target, use 0.5
             verticalTargetMargin    = new DoubleProperty(this, "Margin for vertical ratio", .04), //for last year's target, use 0.3
-            horizontalTargetRatio   = new DoubleProperty(this, "Ratio of horizontal target, b:h", 5.875), //for last year's target, use 2.0
-            horizontalTargetMargin  = new DoubleProperty(this, "Margin for horizontal ratio", .3), //for last year's target, use 0.9
+            horizontalTargetRatio   = new DoubleProperty(this, "Ratio of horizontal target, b:h", 7.4), //for last year's target, use 2.0
+            horizontalTargetMargin  = new DoubleProperty(this, "Margin for horizontal ratio", .01), //for last year's target, use 0.9
             
             ballPerimeterVArea      = new DoubleProperty(this, "Value for circumference over area of ball to be less than", 1.2), //for last year's target, use 0.9
     
             ballPercentInPicture    = new DoubleProperty(this, "Percentage of screen that the ball width occupies", 110.0/320.0),
             distance                = new DoubleProperty(this, "Distance from camera for above percentage in inches", 87.5);
     private IplImage bin;
-    public boolean [] isVertical = new boolean [4];
+    public boolean [] isVertical    = new boolean [4];
     
     public ArrayList<IplImage> displayedImages = new ArrayList<>();
     
@@ -111,10 +116,9 @@ extends WPILaptopCameraExtension {
     
     public double imageWidth, imageHeight;
     
-    public WPIPolygon largest, farthest, closest;
-    
-    public double longestRadius = 0.0, longestDistance = 0.0, shortestDistance = 10000.0, distanceToLargestRadius = 0.0;
-    
+    public WPIBinaryImage thresholds;
+    public static WPIImage result;
+
     public Storm2014CV() {
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
@@ -123,6 +127,10 @@ extends WPILaptopCameraExtension {
         processing.add("Contour Target", processingSteps.contoursTarget);
         processing.add("Approximate ball polygons", processingSteps.polygonApproxBall);
         processing.add("Approximate target polygons", processingSteps.polygonApproxTarget);
+        processing.add("Output CheckedPolygons for ball", processingSteps.checkCheckedPolygons);
+        processing.add("Output CheckedPolygons for target", processingSteps.checkCheckedTargetPolygons);
+        processing.add("Output vertical rectangles", processingSteps.showVerticalRects);
+        processing.add("Output horizontal", processingSteps.showHorizontalRects);
         processing.add("Everything", processingSteps.everything);
         processing.setDefault("Everything");
         
@@ -134,7 +142,7 @@ extends WPILaptopCameraExtension {
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(SomethingCVPrep.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Storm2014CV.class.getName()).log(Level.SEVERE, null, ex);
         }*/
     }
     
@@ -160,7 +168,7 @@ extends WPILaptopCameraExtension {
         if(processing.getValue()== (processingSteps.doNothing)){return rawImage;}
         
         for(int i = 0;i<2;i++){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
-            WPIBinaryImage thresholds;
+            
             WPIContour [] contours;
             WPIPolygon [] checkedPolygons;
             WPIColor wpiCircleColorProp = new WPIColor(circleColorProp.getValue());
@@ -169,7 +177,7 @@ extends WPILaptopCameraExtension {
             IplImage thresholdIPL;
             //System.out.println("tic");
             if(i==0){
-                thresholds = findThresholds(rawImage, hueMinCircle.getValue(), hueMaxCircle.getValue(), satMinCircle.getValue(), satMaxCircle.getValue(), valMinCircle.getValue(), valMaxCircle.getValue());
+                thresholds = findThresholds(rawImage, hueMinCircle.getValue(), hueMaxCircle.getValue(), satMinCircle.getValue(), satMaxCircle.getValue(), valMinCircle.getValue(), valMaxCircle.getValue(), closingsForBall.getValue());
                 thresholdIPL = StormExtensions.getIplImage(thresholds);
                 if(processing.getValue() == processingSteps.thresholdBall){
                 // Allocate ret if it's the first time, otherwise reuse it.
@@ -182,7 +190,7 @@ extends WPILaptopCameraExtension {
                     return ret;
                 }
             }else{
-                thresholds = findThresholds(rawImage, hueMinSquare.getValue(), hueMaxSquare.getValue(), satMinSquare.getValue(), satMaxSquare.getValue(), valMinSquare.getValue(), valMaxSquare.getValue());
+                thresholds = findThresholds(rawImage, hueMinSquare.getValue(), hueMaxSquare.getValue(), satMinSquare.getValue(), satMaxSquare.getValue(), valMinSquare.getValue(), valMaxSquare.getValue(), closingsForTarget.getValue());
                 thresholdIPL = StormExtensions.getIplImage(thresholds);
                 if(processing.getValue() == processingSteps.thresholdTarget){
                 // Allocate ret if it's the first time, otherwise reuse it.
@@ -202,7 +210,19 @@ extends WPILaptopCameraExtension {
             }else{if(processing.getValue() == processingSteps.contoursTarget && i == 1){rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());return rawImage;}}
             
             if(i == 0){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
+                
+                WPIPolygon closest;
+                
+                double largestRadius = 0.0, longestDistance = 0.0, shortestDistance = 10000.0, distanceToLargestRadius = 0.0;
+                
                 if(contours.length != 0){
+                    
+                    checkedPolygons = findCircle(contours, verticesCirc.getValue());
+                    
+                    if(processing.getValue() == processingSteps.checkCheckedPolygons){
+                        rawImage.drawPolygons(checkedPolygons, wpiCircleColorProp, width.getValue());
+                        return rawImage;
+                    }
                     
                     if(processing.getValue() == processingSteps.polygonApproxBall){
                         WPIPolygon [] returnBalls = new WPIPolygon[contours.length];
@@ -213,52 +233,49 @@ extends WPILaptopCameraExtension {
                         return rawImage;
                     }
                     
-                    checkedPolygons = findCircle(contours, verticesCirc.getValue());
                     if(checkedPolygons != null && checkedPolygons.length !=0){
+                        
+                        //System.out.println("Have polygons");
+                        
+                        closest = checkedPolygons[0];
                         
                         for (WPIPolygon p : checkedPolygons) {
                             
                             WPIPoint [] vertices = p.getPoints();
                             double currentDistance;
-                            double maxDistance = 0.0;
+                            double maxRadius = 0.0;
                             
                             for(int j = 0; j<vertices.length - 1;j++){
                                 for(int k = j+1;k<vertices.length;k++){
                                     currentDistance = distanceFormula(vertices[j].getX(), vertices[j].getY(), vertices[k].getX(), vertices[k].getY());
-                                    if(currentDistance > maxDistance)
-                                        maxDistance = currentDistance;
+                                    if(currentDistance > maxRadius)
+                                        maxRadius = currentDistance;
                                     
                                 }
                             }
                             
-                            double ballPercentInCamera = maxDistance/(double)rawImage.getWidth();
+                            double ballPercentInCamera = maxRadius/(double)rawImage.getWidth();
                             double distanceToBall = (ballPercentInPicture.getValue()/ballPercentInCamera) * distance.getValue();
                             
-                            if(maxDistance > longestRadius){
-                                longestRadius = maxDistance;
-                                largest = p;
-                                distanceToLargestRadius = distanceToBall;
-                            }
-                            if(distanceToBall > longestDistance){
-                                longestDistance = distanceToBall;
-                                farthest = p;
-                            }
                             if(distanceToBall < shortestDistance){
                                 shortestDistance = distanceToBall;
                                 closest = p;
                             }
+                            
+                            //System.out.println(longestDistance);
                         }
                         WPIPolygon finalBall = closest;
                         double distanceToBall = shortestDistance, XAngle, YAngle;
-                        if(selection.getValue() == selectionSteps.farthest){
+                        /*if(selection.getValue() == selectionSteps.farthest){
                             finalBall = farthest;
                             distanceToBall = longestDistance;
+                        }else{
+                            if(selection.getValue() == selectionSteps.biggest){
+                                distanceToBall = distanceToLargestRadius;
+                                finalBall = largest;
+                            }
                         }
-                        if(selection.getValue() == selectionSteps.biggest){
-                            distanceToBall = distanceToLargestRadius;
-                            finalBall = largest;
-                        }
-                        
+                        */
                         YAngle = ((2*(finalBall.getY() + (finalBall.getHeight()/2)))/rawImage.getHeight() - 1) * (cameraYAngle.getValue()/2);
                         XAngle = ((2*(finalBall.getX() + (finalBall.getWidth()/2)))/rawImage.getWidth() - 1) * (cameraXAngle.getValue()/2);
                         
@@ -267,7 +284,7 @@ extends WPILaptopCameraExtension {
                         outputTable.putNumber("Distance to ball in inches", distanceToBall);
                         outputTable.putBoolean("Found ball", true);
                         rawImage.drawPolygon(finalBall, wpiCircleColorProp, width.getValue());
-
+                        
                     }else{
                         outputTable.putBoolean("Found ball", false);
                     }
@@ -284,9 +301,15 @@ extends WPILaptopCameraExtension {
                         return rawImage;
                     }
                     
+                    
+                    
                     checkedPolygons = checkPolygons(contours, verticesRect.getValue().intValue());
                     if(checkedPolygons != null && checkedPolygons.length !=0){
-
+                        
+                        if(processing.getValue() == processingSteps.checkCheckedTargetPolygons){
+                            rawImage.drawPolygons(checkedPolygons, wpiCircleColorProp, width.getValue());
+                        }
+                        
                         ArrayList<WPIPolygon> horizontalRectangleList = new ArrayList<>();
                         ArrayList<WPIPolygon> verticalRectangleList = new ArrayList<>();
                         
@@ -300,6 +323,17 @@ extends WPILaptopCameraExtension {
                                 horizontalRectangleList.add(y);
                             }
                             
+                        }
+                        
+                        if(processing.getValue() == processingSteps.showHorizontalRects){
+                            for(WPIPolygon p : horizontalRectangleList){
+                                rawImage.drawPolygon(p, wpiCircleColorProp, width.getValue());
+                            }
+                        }
+                        if(processing.getValue() == processingSteps.showVerticalRects){
+                            for(WPIPolygon p : verticalRectangleList){
+                                rawImage.drawPolygon(p, wpiCircleColorProp, width.getValue());
+                            }
                         }
                         
                         ArrayList<WPIPolygon> finalVertical = new ArrayList<>();
@@ -324,7 +358,7 @@ extends WPILaptopCameraExtension {
                             if(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < verticalTargetMargin.getValue().doubleValue()){
                                 finalVertical.add(p);
                             }else{
-                                System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
+                                //System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
                             }
                         }
                         for(WPIPolygon p : horizontalRectangleList){
@@ -347,7 +381,7 @@ extends WPILaptopCameraExtension {
                             if(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < horizontalTargetMargin.getValue().doubleValue()){
                                 finalHorizontal.add(p);
                             }else{
-                                System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
+                                //System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
                             }
                         }
                         
@@ -402,9 +436,12 @@ extends WPILaptopCameraExtension {
                             horizontalRectangle[j] = y;
                         }
                         
-                        rawImage.drawPolygons(verticalRectangle, wpiVerticalColorProp, width.getValue());
-                        rawImage.drawPolygons(horizontalRectangle, wpiHorizontalColorProp, width.getValue());
-
+                        if(processing.getValue() != processingSteps.showVerticalRects){
+                            rawImage.drawPolygons(verticalRectangle, wpiVerticalColorProp, width.getValue());
+                        }
+                        if(processing.getValue() != processingSteps.showHorizontalRects){
+                            rawImage.drawPolygons(horizontalRectangle, wpiHorizontalColorProp, width.getValue());
+                        }
                     }
                 }else{
                     outputTable.putBoolean("Found vertical target", false);
@@ -418,8 +455,7 @@ extends WPILaptopCameraExtension {
         return rawImage;
     }
     
-    
-    public WPIBinaryImage findThresholds(WPIColorImage rawImage, Integer hueMin, Integer hueMax, Integer satMin, Integer satMax, Integer valMin, Integer valMax) {
+    public WPIBinaryImage findThresholds(WPIColorImage rawImage, Integer hueMin, Integer hueMax, Integer satMin, Integer satMax, Integer valMin, Integer valMax, Integer closings) {
         
         IplImage hueMinImg;
         IplImage satMinImg;
@@ -457,7 +493,7 @@ extends WPILaptopCameraExtension {
         cvAnd(satMinImg, bin, bin, null);
         cvAnd(hueMinImg, bin, bin, null);
         
-        opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, closings.getValue());
+        opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, closings);
         
         hueMinImg.deallocate();
         satMinImg.deallocate();
@@ -485,11 +521,8 @@ extends WPILaptopCameraExtension {
                 
             for(int y = 0; y < polygons.size(); y++){
                 
-                int centerX, centerY, YPos, XPos;
-                
                 WPIPolygon p = polygons.get(y);
                 
-                double aspectRatio;
                 WPIPoint [] points;
                 boolean orderChecks = true;
                 if(!p.isConvex() || p.getNumVertices() != vertices){
@@ -503,9 +536,11 @@ extends WPILaptopCameraExtension {
                     isVertical[x] = checkVert(points[x], points[(x+1) % vertices]);
                 }
 
-                if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3]) || (!isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
+                if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3] || !isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
                     orderChecks = false;
-                    //System.out.println("Failed side order check");
+                    System.out.println("Failed side order check");
+                }else{
+                    System.out.println("passed side order check");
                 }
                 
                 if(orderChecks){
@@ -514,8 +549,6 @@ extends WPILaptopCameraExtension {
             
             
             }
-            
-    
             
         }
         if(!checkedPolygons.isEmpty()){
@@ -569,9 +602,15 @@ extends WPILaptopCameraExtension {
                     "Width of image: " + imageWidth + "\n" + 
                     "Height of image: " + imageHeight + "\n");*/
             
-            if(poly.getNumVertices() < vertices || ((x.getWidth()*x.getHeight())/(imageHeight*imageWidth))*100.0 < screenPercentage.getValue()){
+            if(poly.getNumVertices() < vertices){
+                //System.out.println("Failed vertices check");
                 continue;
             }
+            if(((x.getWidth()*x.getHeight())/(imageHeight*imageWidth))*100.0 < screenPercentage.getValue()){
+                //System.out.println("Failed percentage check");
+                continue;
+            }
+        
             if(((circumference * circumference)/(4 * Math.PI * polygonArea) < ballPerimeterVArea.getValue())){
                 circleChecked.add(poly);
             }
@@ -610,13 +649,11 @@ extends WPILaptopCameraExtension {
                 return;
             }
                
-            WPIImage result;
-               
             cv.processing.setValue(processingSteps.everything);
             result = cv.processImage(rawImage);
             
             cv.displayImage("Result: " + filename, StormExtensions.getIplImage(result));
-               
+            
             System.out.println("Enter continues");
                
             scanner.nextLine();
