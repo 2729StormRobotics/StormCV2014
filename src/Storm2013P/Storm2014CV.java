@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package Storm2013P; 
 import com.googlecode.javacv.CanvasFrame;
 import static com.googlecode.javacv.cpp.opencv_core.*;
@@ -66,12 +62,12 @@ extends WPICameraExtension {
             cameraYAngle          = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
             screenPercentage      = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
     public IntegerProperty        
-            hueMinCircle          = new IntegerProperty(this, "Hue minimum value for circle", 85), //For red ball, 125, for red ball picture, 1
-            hueMaxCircle          = new IntegerProperty(this, "Hue maximum value for circle", 130), //For red ball, 170, for red ball picture, 19
-            satMinCircle          = new IntegerProperty(this, "Saturation minimum value for circle", 110), //For red ball, 90, for red ball picture, 200
-            satMaxCircle          = new IntegerProperty(this, "Saturation maximum value for circle", 185), //For red ball, 170, for red ball picture, 215
-            valMinCircle          = new IntegerProperty(this, "Value minimum value for circle", 0), //For red ball, 50, for red ball picture, 78
-            valMaxCircle          = new IntegerProperty(this, "Value maximum value for circle", 185), //For red ball, 230, for red ball picture, 200
+            hueMinCircle          = new IntegerProperty(this, "Hue minimum value for circle", 125), //For red ball, 125, for red ball picture, 1
+            hueMaxCircle          = new IntegerProperty(this, "Hue maximum value for circle", 170), //For red ball, 170, for red ball picture, 19
+            satMinCircle          = new IntegerProperty(this, "Saturation minimum value for circle", 90), //For red ball, 90, for red ball picture, 200
+            satMaxCircle          = new IntegerProperty(this, "Saturation maximum value for circle", 170), //For red ball, 170, for red ball picture, 215
+            valMinCircle          = new IntegerProperty(this, "Value minimum value for circle", 50), //For red ball, 50, for red ball picture, 78
+            valMaxCircle          = new IntegerProperty(this, "Value maximum value for circle", 230), //For red ball, 230, for red ball picture, 200
             hueMinSquare          = new IntegerProperty(this, "Hue minimum value for rectangle", 50), //For picture: 75
             hueMaxSquare          = new IntegerProperty(this, "Hue maximum value for rectangle", 90), //For picture: 100
             satMinSquare          = new IntegerProperty(this, "Saturation minimum value for rectangle", 220),//for picture: 10
@@ -148,6 +144,8 @@ extends WPICameraExtension {
         selection.add("Largest ball", selectionSteps.biggest);
         selection.setDefault("Closest ball");
         
+        outputTable.putBoolean("Blue Alliance?", false);
+        
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
         } catch (FileNotFoundException ex) {
@@ -159,6 +157,25 @@ extends WPICameraExtension {
     @Override
     public WPIImage processImage(WPIColorImage rawImage){
         double startTime = System.currentTimeMillis();
+        
+        //needs to be enabled for competition, disabled because of problems with testing
+        
+        /*if(outputTable.getBoolean("Blue Alliance?")){
+            hueMinCircle.setValue(85);
+            hueMaxCircle.setValue(130);
+            satMinCircle.setValue(110);
+            satMaxCircle.setValue(185);
+            valMinCircle.setValue(0);
+            valMaxCircle.setValue(185);
+        }else{
+            hueMinCircle.setValue(hueMinCircle.getDefault());
+            hueMaxCircle.setValue(hueMaxCircle.getDefault());
+            satMinCircle.setValue(satMinCircle.getDefault());
+            satMaxCircle.setValue(satMaxCircle.getDefault());
+            valMinCircle.setValue(valMinCircle.getDefault());
+            valMaxCircle.setValue(valMaxCircle.getDefault());
+        }*/
+        
         if(imageTest.getValue()){
             try {
                 testImage = new WPIColorImage(ImageIO.read(new File("test.jpg")));
@@ -184,7 +201,6 @@ extends WPICameraExtension {
             WPIColor wpiHorizontalColorProp = new WPIColor(horizontalColorProp.getValue());
             WPIColor wpiVerticalColorProp = new WPIColor(verticalColorProp.getValue());
             IplImage thresholdIPL;
-            //System.out.println("tic");
             
             if(size == null || size.width() != rawImage.getWidth() || size.height() != rawImage.getHeight()) {
                 size    = cvSize(rawImage.getWidth(),rawImage.getHeight());
@@ -193,8 +209,8 @@ extends WPICameraExtension {
                 hueImg  = IplImage.create(size, 8, 1);
                 satImg  = IplImage.create(size, 8, 1);
                 valImg  = IplImage.create(size, 8, 1);
+                temp  = IplImage.create(size, 8, 1);
             }
-            
             
             if(i==0){
                 thresholds = findThresholds(rawImage, hueMinCircle.getValue(), hueMaxCircle.getValue(), satMinCircle.getValue(), satMaxCircle.getValue(), valMinCircle.getValue(), valMaxCircle.getValue(), closingsForBall.getValue());
@@ -440,7 +456,7 @@ extends WPICameraExtension {
                             
                             WPIPolygon y = finalHorizontal.get(j);
                             double centerX, centerY, YPos, XPos, YAngle, XAngle;
-
+                            
                             centerX = y.getX() + (y.getWidth()/2);
                             centerY = y.getY() + (y.getHeight()/2);
                             
@@ -469,7 +485,6 @@ extends WPICameraExtension {
                     outputTable.putBoolean("Found horizontal target", false);
                 }
             }
-            thresholdIPL.deallocate();
         }
         double endTime = System.currentTimeMillis();
         outputTable.putNumber("Time taken in milliseconds", endTime - startTime);
@@ -505,8 +520,6 @@ extends WPICameraExtension {
         cvAnd(hueImg, bin, bin, null);
         
         opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, closings);
-        
-        camIn.deallocate();
         
         return StormExtensions.makeWPIBinaryImage(bin);
         
@@ -598,9 +611,6 @@ extends WPICameraExtension {
             WPIPolygon poly = x.approxPolygon(percentAccCircle.getValue());
             double polygonArea = poly.getArea();
             double circumference = poly.getPerimeter();
-            if(poly.getNumVertices() < 3){
-                continue;
-            }
             //System.out.println("");
             /*System.out.println("Circumference: " + circumference + "\n" + 
                     "Area: " + polygonArea + "\n" + 
@@ -672,8 +682,8 @@ extends WPICameraExtension {
          IplImage newImage = IplImage.create(image.cvSize(), image.depth(), image.nChannels());
          cvCopy(image, newImage);
          displayedImages.add(newImage);
-         CanvasFrame result = new CanvasFrame(title);
-         result.showImage(newImage.getBufferedImage());
+         CanvasFrame resultFrame = new CanvasFrame(title);
+         resultFrame.showImage(newImage.getBufferedImage());
          newImage.deallocate();
     }
 }
