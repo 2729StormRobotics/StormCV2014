@@ -62,12 +62,18 @@ extends WPICameraExtension {
             cameraYAngle          = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
             screenPercentage      = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
     public IntegerProperty        
-            hueMinCircle          = new IntegerProperty(this, "Hue minimum value for circle", 125), //For red ball, 125, for red ball picture, 1
-            hueMaxCircle          = new IntegerProperty(this, "Hue maximum value for circle", 170), //For red ball, 170, for red ball picture, 19
-            satMinCircle          = new IntegerProperty(this, "Saturation minimum value for circle", 90), //For red ball, 90, for red ball picture, 200
-            satMaxCircle          = new IntegerProperty(this, "Saturation maximum value for circle", 170), //For red ball, 170, for red ball picture, 215
-            valMinCircle          = new IntegerProperty(this, "Value minimum value for circle", 50), //For red ball, 50, for red ball picture, 78
-            valMaxCircle          = new IntegerProperty(this, "Value maximum value for circle", 230), //For red ball, 230, for red ball picture, 200
+            hueMinRedBall          = new IntegerProperty(this, "Hue minimum value for red ball", 125), //For picture, 1
+            hueMaxRedBall          = new IntegerProperty(this, "Hue maximum value for red ball", 170), //For picture, 19
+            satMinRedBall          = new IntegerProperty(this, "Saturation minimum value for red ball", 90), //For picture, 200
+            satMaxRedBall          = new IntegerProperty(this, "Saturation maximum value for red ball", 170), //For picture, 215
+            valMinRedBall          = new IntegerProperty(this, "Value minimum value for red ball", 50), //For picture, 78
+            valMaxRedBall          = new IntegerProperty(this, "Value maximum value for red ball", 230), //For picture, 200
+            hueMinBlueBall          = new IntegerProperty(this, "Hue minimum value for blue ball", 125), 
+            hueMaxBlueBall          = new IntegerProperty(this, "Hue maximum value for blue ball", 170), 
+            satMinBlueBall          = new IntegerProperty(this, "Saturation minimum value for blue ball", 90), 
+            satMaxBlueBall          = new IntegerProperty(this, "Saturation maximum value for blue ball", 170), 
+            valMinBlueBall          = new IntegerProperty(this, "Value minimum value for blue ball", 50), 
+            valMaxBlueBall          = new IntegerProperty(this, "Value maximum value for blue ball", 230), 
             hueMinSquare          = new IntegerProperty(this, "Hue minimum value for rectangle", 50), //For picture: 75
             hueMaxSquare          = new IntegerProperty(this, "Hue maximum value for rectangle", 90), //For picture: 100
             satMinSquare          = new IntegerProperty(this, "Saturation minimum value for rectangle", 220),//for picture: 10
@@ -157,24 +163,23 @@ extends WPICameraExtension {
     @Override
     public WPIImage processImage(WPIColorImage rawImage){
         double startTime = System.currentTimeMillis();
+        Integer ballHueMin, ballHueMax, ballSatMin, ballSatMax, ballValMin, ballValMax;
         
-        //needs to be enabled for competition, disabled because of problems with testing
-        
-        /*if(outputTable.getBoolean("Blue Alliance?")){
-            hueMinCircle.setValue(85);
-            hueMaxCircle.setValue(130);
-            satMinCircle.setValue(110);
-            satMaxCircle.setValue(185);
-            valMinCircle.setValue(0);
-            valMaxCircle.setValue(185);
+        if(outputTable.getBoolean("Blue Alliance?")){
+            ballHueMin = hueMinBlueBall.getValue();
+            ballHueMax = hueMaxBlueBall.getValue();
+            ballSatMin = satMinBlueBall.getValue();
+            ballSatMax = satMaxBlueBall.getValue();
+            ballValMin = valMinBlueBall.getValue();
+            ballValMax = valMaxBlueBall.getValue();
         }else{
-            hueMinCircle.setValue(hueMinCircle.getDefault());
-            hueMaxCircle.setValue(hueMaxCircle.getDefault());
-            satMinCircle.setValue(satMinCircle.getDefault());
-            satMaxCircle.setValue(satMaxCircle.getDefault());
-            valMinCircle.setValue(valMinCircle.getDefault());
-            valMaxCircle.setValue(valMaxCircle.getDefault());
-        }*/
+            ballHueMin = hueMinRedBall.getValue();
+            ballHueMax = hueMaxRedBall.getValue();
+            ballSatMin = satMinRedBall.getValue();
+            ballSatMax = satMaxRedBall.getValue();
+            ballValMin = valMinRedBall.getValue();
+            ballValMax = valMaxRedBall.getValue();
+        }
         
         if(imageTest.getValue()){
             try {
@@ -213,7 +218,7 @@ extends WPICameraExtension {
             }
             
             if(i==0){
-                thresholds = findThresholds(rawImage, hueMinCircle.getValue(), hueMaxCircle.getValue(), satMinCircle.getValue(), satMaxCircle.getValue(), valMinCircle.getValue(), valMaxCircle.getValue(), closingsForBall.getValue());
+                thresholds = findThresholds(rawImage, ballHueMin, ballHueMax, ballSatMin, ballSatMax, ballValMin, ballValMax, closingsForBall.getValue());
                 thresholdIPL = StormExtensions.getIplImage(thresholds);
                 if(processing.getValue() == processingSteps.thresholdBall){
                 // Allocate ret if it's the first time, otherwise reuse it.
