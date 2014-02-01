@@ -47,8 +47,8 @@ extends WPICameraExtension {
     public MultiProperty processing = new MultiProperty(this, "Process how far");
     public MultiProperty selection = new MultiProperty(this, "Select which ball?");
     
-
-
+    
+    
     public enum processingSteps{
         doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, polygonApproxBall, polygonApproxTarget, checkCheckedPolygons, showVerticalRects, showHorizontalRects, everything, checkCheckedTargetPolygons
     }
@@ -119,6 +119,8 @@ extends WPICameraExtension {
     private CvSize size;
     private IplImage hsv;
     
+    private double horizontalXAngle = 0.0, verticalXAngle = 0.0, horizontalYAngle = 0.0, verticalYAngle = 0.0;
+    
     private final boolean [] isVertical    = new boolean [4];
     
     private final ArrayList<IplImage> displayedImages = new ArrayList<>();
@@ -131,9 +133,9 @@ extends WPICameraExtension {
     private static WPIImage result;
     
     public Storm2014CV() {
+        processing.add("Nothing", processingSteps.doNothing);
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
-        processing.add("Nothing", processingSteps.doNothing);
         processing.add("Contour Ball", processingSteps.contoursBall);
         processing.add("Contour Target", processingSteps.contoursTarget);
         processing.add("Approximate ball polygons", processingSteps.polygonApproxBall);
@@ -214,12 +216,15 @@ extends WPICameraExtension {
             IplImage thresholdIPL;
             
             if(size == null || size.width() != rawImage.getWidth() || size.height() != rawImage.getHeight()) {
-                hsv.deallocate();
-                bin.deallocate();
-                hueImg.deallocate();
-                satImg.deallocate();
-                valImg.deallocate();
-                temp.deallocate();
+                if(hsv != null){
+                    hsv.deallocate();
+                    bin.deallocate();
+                    hueImg.deallocate();
+                    satImg.deallocate();
+                    valImg.deallocate();
+                    temp.deallocate();
+                }
+                
                 size    = cvSize(rawImage.getWidth(),rawImage.getHeight());
                 hsv     = IplImage.create(size, 8, 3);
                 bin     = IplImage.create(size, 8, 1);
@@ -258,9 +263,16 @@ extends WPICameraExtension {
             }
             
             contours = StormExtensions.findConvexContours(thresholds);
-
-            if(processing.getValue() == processingSteps.contoursBall && i == 0){rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());return rawImage;
-            }else{if(processing.getValue() == processingSteps.contoursTarget && i == 1){rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());return rawImage;}}
+            
+            if(processing.getValue() == processingSteps.contoursBall && i == 0){
+                rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());
+                return rawImage;
+            }else{
+                if(processing.getValue() == processingSteps.contoursTarget && i == 1){
+                    rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());
+                    return rawImage;
+                }
+            }
             
             if(i == 0){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
                 
@@ -458,11 +470,9 @@ extends WPICameraExtension {
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
                             
-                            outputTable.putNumber("Vertical target horizontal angle", XAngle);
-                            outputTable.putNumber("Vertical target vertical angle", YAngle);
+                            verticalXAngle = XAngle;
+                            verticalYAngle = YAngle;
                             foundVertical = true;
-                            
-                            
                             
                             verticalRectangle[j] = y;
                         }
@@ -480,8 +490,8 @@ extends WPICameraExtension {
                             YAngle = YPos * (cameraYAngle.getValue()/2);
                             XAngle = XPos * (cameraXAngle.getValue()/2);
                             
-                            outputTable.putNumber("Horizontal target horizontal angle", XAngle);
-                            outputTable.putNumber("Horizontal target vertical angle", YAngle);
+                            horizontalXAngle = XAngle;
+                            horizontalYAngle = YAngle;
                             foundHorizontal = true;
                             
                             horizontalRectangle[j] = y;
@@ -496,7 +506,11 @@ extends WPICameraExtension {
                     }
                 }
                 outputTable.putBoolean("Found horizontal target", foundHorizontal);
+                outputTable.putNumber("Horizontal target horizontal angle", horizontalXAngle);
+                outputTable.putNumber("Horizontal target vertical angle", horizontalYAngle);
                 outputTable.putBoolean("Found vertical target", foundVertical);
+                outputTable.putNumber("Vertical target horizontal angle", verticalXAngle);
+                outputTable.putNumber("Vertical target vertical angle", verticalYAngle);
             }
         }
         long endTime = System.currentTimeMillis();
@@ -507,6 +521,7 @@ extends WPICameraExtension {
     public WPIBinaryImage findThresholds(WPIColorImage rawImage, Integer hueMin, Integer hueMax, Integer satMin, Integer satMax, Integer valMin, Integer valMax, Integer closings) {
 
         IplConvKernel morphKernel;
+        
         morphKernel = IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);
         
         IplImage camIn = StormExtensions.getIplImage(rawImage);
@@ -533,6 +548,8 @@ extends WPICameraExtension {
         cvAnd(hueImg, bin, bin, null);
         
         opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, closings);
+        
+        morphKernel.deallocate();
         
         return StormExtensions.makeWPIBinaryImage(bin);
         
