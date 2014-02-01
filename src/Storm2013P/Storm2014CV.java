@@ -57,11 +57,11 @@ extends WPICameraExtension {
         closest, farthest, biggest
     }
     
-    public DoubleProperty  
+    private final DoubleProperty  
             cameraXAngle          = new DoubleProperty(this, "Camera horizontal FOV angle", 47),
             cameraYAngle          = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
             screenPercentage      = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
-    public IntegerProperty        
+    private final IntegerProperty        
             hueMinRedBall          = new IntegerProperty(this, "Hue minimum value for red ball", 125), //For picture, 1
             hueMaxRedBall          = new IntegerProperty(this, "Hue maximum value for red ball", 170), //For picture, 19
             satMinRedBall          = new IntegerProperty(this, "Saturation minimum value for red ball", 90), //For picture, 200
@@ -85,7 +85,7 @@ extends WPICameraExtension {
             width                 = new IntegerProperty(this, "Contour width", 5),
             verticesCirc          = new IntegerProperty(this, "Number of ball vertices", 8),
             verticesRect          = new IntegerProperty(this, "Number of target vertices", 4);
-    public ColorProperty          
+    private final ColorProperty          
             circleColorProp       = new ColorProperty(this, "Contour color for the ball", Color.BLACK),
             horizontalColorProp   = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
             verticalColorProp     = new ColorProperty(this, "Contour color for the vertical target", Color.CYAN);
@@ -93,11 +93,11 @@ extends WPICameraExtension {
             
     private WPIImage ret;
     
-    public WPIColorImage testImage, processImage;
+    private WPIColorImage testImage, processImage;
     
-    public BooleanProperty imageTest = new BooleanProperty(this, "Test with image?", false);
+    private final BooleanProperty imageTest = new BooleanProperty(this, "Test with image?", false);
     
-    public DoubleProperty
+    private final DoubleProperty
             percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 10),
             percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 10),
             
@@ -119,17 +119,17 @@ extends WPICameraExtension {
     private CvSize size;
     private IplImage hsv;
     
-    public boolean [] isVertical    = new boolean [4];
+    private final boolean [] isVertical    = new boolean [4];
     
-    public ArrayList<IplImage> displayedImages = new ArrayList<>();
+    private final ArrayList<IplImage> displayedImages = new ArrayList<>();
     
     private static final ITable outputTable = Robot.getTable();
     
-    public double imageWidth, imageHeight;
+    private double imageWidth, imageHeight;
     
-    public WPIBinaryImage thresholds;
-    public static WPIImage result;
-
+    private WPIBinaryImage thresholds;
+    private static WPIImage result;
+    
     public Storm2014CV() {
         processing.add("Threshold Ball", processingSteps.thresholdBall);
         processing.add("Threshold Target", processingSteps.thresholdTarget);
@@ -162,8 +162,14 @@ extends WPICameraExtension {
     
     @Override
     public WPIImage processImage(WPIColorImage rawImage){
-        double startTime = System.currentTimeMillis();
+        long startTime = System.currentTimeMillis();
         Integer ballHueMin, ballHueMax, ballSatMin, ballSatMax, ballValMin, ballValMax;
+        
+        if(outputTable.getBoolean("Enabled", false)){
+            
+        }
+        
+        
         
         if(outputTable.getBoolean("Blue Alliance?")){
             ballHueMin = hueMinBlueBall.getValue();
@@ -208,13 +214,19 @@ extends WPICameraExtension {
             IplImage thresholdIPL;
             
             if(size == null || size.width() != rawImage.getWidth() || size.height() != rawImage.getHeight()) {
+                hsv.deallocate();
+                bin.deallocate();
+                hueImg.deallocate();
+                satImg.deallocate();
+                valImg.deallocate();
+                temp.deallocate();
                 size    = cvSize(rawImage.getWidth(),rawImage.getHeight());
                 hsv     = IplImage.create(size, 8, 3);
                 bin     = IplImage.create(size, 8, 1);
                 hueImg  = IplImage.create(size, 8, 1);
                 satImg  = IplImage.create(size, 8, 1);
                 valImg  = IplImage.create(size, 8, 1);
-                temp  = IplImage.create(size, 8, 1);
+                temp    = IplImage.create(size, 8, 1);
             }
             
             if(i==0){
@@ -331,6 +343,9 @@ extends WPICameraExtension {
                     }
                 }
             }else{
+                
+                boolean foundHorizontal = false, foundVertical = false;
+                
                 if(contours.length != 0){
                     
                     if(processing.getValue() == processingSteps.polygonApproxTarget){
@@ -428,13 +443,7 @@ extends WPICameraExtension {
                         
                         WPIPolygon[] verticalRectangle = new WPIPolygon[finalVertical.size()];
                         WPIPolygon[] horizontalRectangle = new WPIPolygon[finalHorizontal.size()];
-                        if(horizontalRectangle.length == 0){
-                            outputTable.putBoolean("Found horizontal target", false);
-                        }
-                        if(verticalRectangle.length == 0){
-                            outputTable.putBoolean("Found vertical target", false);
-                        }
-             
+                        
                         for(int j = 0; j<finalVertical.size();j++){
                             
                             WPIPolygon y = finalVertical.get(j);
@@ -451,7 +460,7 @@ extends WPICameraExtension {
                             
                             outputTable.putNumber("Vertical target horizontal angle", XAngle);
                             outputTable.putNumber("Vertical target vertical angle", YAngle);
-                            outputTable.putBoolean("Found horizontal target", true);
+                            foundVertical = true;
                             
                             
                             
@@ -473,7 +482,7 @@ extends WPICameraExtension {
                             
                             outputTable.putNumber("Horizontal target horizontal angle", XAngle);
                             outputTable.putNumber("Horizontal target vertical angle", YAngle);
-                            outputTable.putBoolean("Found horizontal target", true);
+                            foundHorizontal = true;
                             
                             horizontalRectangle[j] = y;
                         }
@@ -485,13 +494,12 @@ extends WPICameraExtension {
                             rawImage.drawPolygons(horizontalRectangle, wpiHorizontalColorProp, width.getValue());
                         }
                     }
-                }else{
-                    outputTable.putBoolean("Found vertical target", false);
-                    outputTable.putBoolean("Found horizontal target", false);
                 }
+                outputTable.putBoolean("Found horizontal target", foundHorizontal);
+                outputTable.putBoolean("Found vertical target", foundVertical);
             }
         }
-        double endTime = System.currentTimeMillis();
+        long endTime = System.currentTimeMillis();
         outputTable.putNumber("Time taken in milliseconds", endTime - startTime);
         return rawImage;
     }
@@ -564,9 +572,9 @@ extends WPICameraExtension {
 
                 if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3] || !isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
                     orderChecks = false;
-                    System.out.println("Failed side order check");
+                    //System.out.println("Failed side order check");
                 }else{
-                    System.out.println("passed side order check");
+                    //System.out.println("passed side order check");
                 }
                 
                 if(orderChecks){
