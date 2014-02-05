@@ -17,6 +17,7 @@ import edu.wpi.first.smartdashboard.camera.WPILaptopCameraExtension;
 import edu.wpi.first.smartdashboard.properties.BooleanProperty;
 import edu.wpi.first.smartdashboard.properties.ColorProperty;
 import edu.wpi.first.smartdashboard.properties.DoubleProperty;
+import edu.wpi.first.smartdashboard.properties.StringProperty;
 import edu.wpi.first.wpijavacv.StormExtensions;
 import edu.wpi.first.wpijavacv.WPIColor;
 import edu.wpi.first.wpijavacv.WPIPoint;
@@ -28,6 +29,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -60,7 +63,7 @@ extends WPICameraExtension {
     private final DoubleProperty  
             cameraXAngle          = new DoubleProperty(this, "Camera horizontal FOV angle", 47),
             cameraYAngle          = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
-            screenPercentage      = new DoubleProperty(this, "Percentage of screen sphere must cover", 5.0);
+            screenPercentage      = new DoubleProperty(this, "Percentage of screen sphere must cover", 1.0);
     private final IntegerProperty        
             hueMinRedBall          = new IntegerProperty(this, "Hue minimum value for red ball", 125), //For picture, 1
             hueMaxRedBall          = new IntegerProperty(this, "Hue maximum value for red ball", 170), //For picture, 19
@@ -68,11 +71,11 @@ extends WPICameraExtension {
             satMaxRedBall          = new IntegerProperty(this, "Saturation maximum value for red ball", 170), //For picture, 215
             valMinRedBall          = new IntegerProperty(this, "Value minimum value for red ball", 50), //For picture, 78
             valMaxRedBall          = new IntegerProperty(this, "Value maximum value for red ball", 230), //For picture, 200
-            hueMinBlueBall          = new IntegerProperty(this, "Hue minimum value for blue ball", 125), 
-            hueMaxBlueBall          = new IntegerProperty(this, "Hue maximum value for blue ball", 170), 
-            satMinBlueBall          = new IntegerProperty(this, "Saturation minimum value for blue ball", 90), 
-            satMaxBlueBall          = new IntegerProperty(this, "Saturation maximum value for blue ball", 170), 
-            valMinBlueBall          = new IntegerProperty(this, "Value minimum value for blue ball", 50), 
+            hueMinBlueBall          = new IntegerProperty(this, "Hue minimum value for blue ball", 100), 
+            hueMaxBlueBall          = new IntegerProperty(this, "Hue maximum value for blue ball", 110), 
+            satMinBlueBall          = new IntegerProperty(this, "Saturation minimum value for blue ball", 230), 
+            satMaxBlueBall          = new IntegerProperty(this, "Saturation maximum value for blue ball", 255), 
+            valMinBlueBall          = new IntegerProperty(this, "Value minimum value for blue ball", 10), 
             valMaxBlueBall          = new IntegerProperty(this, "Value maximum value for blue ball", 230), 
             hueMinSquare          = new IntegerProperty(this, "Hue minimum value for rectangle", 50), //For picture: 75
             hueMaxSquare          = new IntegerProperty(this, "Hue maximum value for rectangle", 90), //For picture: 100
@@ -82,15 +85,17 @@ extends WPICameraExtension {
             valMaxSquare          = new IntegerProperty(this, "Value maximum value for rectangle", 255),//for picture: 255
             closingsForBall       = new IntegerProperty(this, "Closing iterations for ball", 2),
             closingsForTarget     = new IntegerProperty(this, "Closing iterations for target", 0),
-            width                 = new IntegerProperty(this, "Contour width", 5),
-            verticesCirc          = new IntegerProperty(this, "Number of ball vertices", 8),
+            width                 = new IntegerProperty(this, "Contour width", 3),
+            verticesCirc          = new IntegerProperty(this, "Number of ball vertices", 5),
             verticesRect          = new IntegerProperty(this, "Number of target vertices", 4);
     private final ColorProperty          
-            circleColorProp       = new ColorProperty(this, "Contour color for the ball", Color.BLACK),
+            circleColorProp       = new ColorProperty(this, "Contour color for the ball", Color.YELLOW),
             horizontalColorProp   = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
             verticalColorProp     = new ColorProperty(this, "Contour color for the vertical target", Color.CYAN);
     //public IplConvKernel morphologyKernel;
-            
+    
+    public final StringProperty saveLocation = new StringProperty(this, "Location for pictures", System.getenv("USERPROFILE") + "/Captures");
+    
     private WPIImage ret;
     
     private WPIColorImage testImage, processImage;
@@ -98,7 +103,7 @@ extends WPICameraExtension {
     private final BooleanProperty imageTest = new BooleanProperty(this, "Test with image?", false);
     
     private final DoubleProperty
-            percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 10),
+            percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 4),
             percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 10),
             
             verticalTargetRatio     = new DoubleProperty(this, "Ratio of vertical target, b:h", 0.125), //for last year's target, use 0.5
@@ -106,11 +111,12 @@ extends WPICameraExtension {
             horizontalTargetRatio   = new DoubleProperty(this, "Ratio of horizontal target, b:h", 7.4), //for last year's target, use 2.0
             horizontalTargetMargin  = new DoubleProperty(this, "Margin for horizontal ratio", .01), //for last year's target, use 0.9
             
-            ballPerimeterVArea      = new DoubleProperty(this, "Value for circumference over area of ball to be less than", 1.2), //for last year's target, use 0.9
+            ballPerimeterVArea      = new DoubleProperty(this, "Value for circumference over area of ball to be less than", 1.4),
     
             ballPercentInPicture    = new DoubleProperty(this, "Percentage of screen that the ball width occupies", 110.0/320.0),
-            distance                = new DoubleProperty(this, "Distance from camera for above percentage in inches", 87.5);
+            distance                = new DoubleProperty(this, "Distance from camera for above percentage in inches", 87.5),
     
+            savePeriod              = new DoubleProperty(this, "Save period", 1.0);
     private IplImage bin;
     private IplImage hueImg;
     private IplImage satImg;
@@ -120,6 +126,8 @@ extends WPICameraExtension {
     private IplImage hsv;
     
     private double horizontalXAngle = 0.0, verticalXAngle = 0.0, horizontalYAngle = 0.0, verticalYAngle = 0.0;
+    
+    private long previousSaveTime = 0;
     
     private final boolean [] isVertical    = new boolean [4];
     
@@ -168,10 +176,42 @@ extends WPICameraExtension {
         Integer ballHueMin, ballHueMax, ballSatMin, ballSatMax, ballValMin, ballValMax;
         
         if(outputTable.getBoolean("Enabled", false)){
-            
+            long currentTime = System.currentTimeMillis();
+            if(!imageTest.getValue() && savePeriod.getValue() >= 0  && (previousSaveTime <0 || previousSaveTime + savePeriod.getValue() <= currentTime)){
+                previousSaveTime = currentTime;
+                final IplImage picture = StormExtensions.getIplImage(rawImage);
+                new Thread(){
+                    private final String fileName = "/Capture " + new SimpleDateFormat("yyyy-MM-dd HH.mm.ss").format(new Date()) + ".jpg";
+                    
+                    private final IplImage copy = IplImage.create(picture.cvSize(), picture.depth(), picture.nChannels());
+                    
+                    //Apparently this is the constructor
+                    {
+                        cvCopy(picture, copy);
+                        setPriority(Thread.MIN_PRIORITY);
+                    }
+                    @Override
+                    public void run(){
+                        try{
+                            System.out.println("Saving \"" + fileName + "\"");
+                            File folderFile = new File(saveLocation.getValue());
+                            folderFile.mkdirs();
+                            File out = new File(saveLocation.getValue() + fileName);
+                            ImageIO.write(copy.getBufferedImage(), "jpg", out);
+                            System.out.println("Saved \"" + fileName + "\"");
+                        }catch(Exception ex){
+                            Logger.getLogger(Storm2014CV.class.getName()).log(Level.SEVERE, "Save of \"" + fileName + "\" failed");
+                            ex.printStackTrace();
+                        }finally{
+                            copy.deallocate();
+                        }
+                    }
+                    
+                }.start();
+            }
+        }else{
+            previousSaveTime = -1;
         }
-        
-        
         
         if(outputTable.getBoolean("Blue Alliance?")){
             ballHueMin = hueMinBlueBall.getValue();
