@@ -160,7 +160,6 @@ extends WPICameraExtension {
         selection.add("Largest ball", selectionSteps.biggest);
         selection.setDefault("Closest ball");
         
-        outputTable.putBoolean("Blue Alliance?", false);
         
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
@@ -319,6 +318,7 @@ extends WPICameraExtension {
                 WPIPolygon closest;
                 
                 double largestRadius = 0.0, longestDistance = 0.0, shortestDistance = 10000.0, distanceToLargestRadius = 0.0;
+                boolean foundBall = false;
                 
                 if(contours.length != 0){
                     
@@ -384,16 +384,16 @@ extends WPICameraExtension {
                         YAngle = ((2*(finalBall.getY() + (finalBall.getHeight()/2)))/rawImage.getHeight() - 1) * (cameraYAngle.getValue()/2);
                         XAngle = ((2*(finalBall.getX() + (finalBall.getWidth()/2)))/rawImage.getWidth() - 1) * (cameraXAngle.getValue()/2);
                         
+                        foundBall = true;
+                        
                         outputTable.putNumber("Ball horizontal angle to center", XAngle);
                         outputTable.putNumber("Ball vertical angle to center", YAngle);
                         outputTable.putNumber("Distance to ball in inches", distanceToBall);
-                        outputTable.putBoolean("Found ball", true);
                         rawImage.drawPolygon(finalBall, wpiCircleColorProp, width.getValue());
                         
-                    }else{
-                        outputTable.putBoolean("Found ball", false);
                     }
                 }
+                outputTable.putBoolean("Found ball", foundBall);
             }else{
                 
                 boolean foundHorizontal = false, foundVertical = false;
