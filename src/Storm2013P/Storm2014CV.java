@@ -50,6 +50,7 @@ extends WPICameraExtension {
     public MultiProperty processing = new MultiProperty(this, "Process how far");
     public MultiProperty ballSelection = new MultiProperty(this, "Select which ball?");
     public MultiProperty targetSelection = new MultiProperty(this, "Select which target?");
+    public MultiProperty distanceReference = new MultiProperty(this, "Where on target to base reference point");
     
     
     
@@ -58,7 +59,11 @@ extends WPICameraExtension {
     }
     
     public enum selectionSteps{
-        closest, farthest, biggest
+        closest, farthest, biggest, centered
+    }
+    
+    public enum referencePoint{
+        top, bottom, middle
     }
     
     private final DoubleProperty  
@@ -167,8 +172,13 @@ extends WPICameraExtension {
         
         targetSelection.add("Closest target", selectionSteps.closest);
         targetSelection.add("Farthest target", selectionSteps.farthest);
+        targetSelection.add("Target closest to center", selectionSteps.centered);
         targetSelection.setDefault("Closest target");
         
+        distanceReference.add("Top of target", referencePoint.top);
+        distanceReference.add("Middle of target", referencePoint.middle);
+        distanceReference.add("Bottom of target", referencePoint.bottom);
+        distanceReference.setDefault(referencePoint.middle);
         
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
@@ -409,6 +419,7 @@ extends WPICameraExtension {
             }else{
                 
                 boolean foundHorizontal = false, foundVertical = false;
+                WPIPolygon selectedVertical = null;
                 double verticalTargetDistance = 0.0; 
                 
                 if(contours.length != 0){
@@ -460,6 +471,7 @@ extends WPICameraExtension {
                         ArrayList<WPIPolygon> finalVertical = new ArrayList<>();
                         ArrayList<WPIPolygon> finalHorizontal = new ArrayList<>();
                         //System.out.println("tic-toc");
+                        
                         for(WPIPolygon p : verticalRectangleList){
                             
                             double [] sideLengths = new double[verticesRect.getValue().intValue()];
@@ -508,7 +520,8 @@ extends WPICameraExtension {
                         
                         WPIPolygon[] verticalRectangle = new WPIPolygon[finalVertical.size()];
                         WPIPolygon[] horizontalRectangle = new WPIPolygon[finalHorizontal.size()];
-                        
+                        double mostCentered = 1.0/0.0, farthest = 0.0, closest = 1.0/0.0, tempVerticalTargetDistance;
+                        double tilterAngle = outputTable.getNumber("Tilter angle", 0.0) * Math.PI / 180.0;
                         for(int j = 0; j<finalVertical.size();j++){
                             
                             WPIPolygon y = finalVertical.get(j);
@@ -523,14 +536,44 @@ extends WPICameraExtension {
                             XAngle = XPos * (FovX/2);
                             YAngle = YPos * (FovY/2);
                             
-                            verticalXAngle = XAngle;
-                            verticalYAngle = YAngle;
-                            foundVertical = true;
+                            double distanceAngle = YAngle;
                             
-                            verticalRectangle[j] = y;
+                            if(distanceReference.getValue() == referencePoint.bottom){
+                                distanceAngle = ((2*y.getY() + y.getHeight())/rawImage.getHeight() - 1) * (FovY/2);
+                            }
+                            if(distanceReference.getValue() == referencePoint.top){
+                                distanceAngle = (2*y.getY()/rawImage.getHeight() - 1) * (FovY/2);
+                            }
+                            
+                            tempVerticalTargetDistance = (targetHeight.getValue() - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle)))/(Math.tan(cameraAngle.getValue()*Math.PI/180.0 + distanceAngle*Math.PI/180.0));
+                            
+                            if(targetSelection.getValue() == selectionSteps.closest && tempVerticalTargetDistance <closest){
+                                verticalTargetDistance = tempVerticalTargetDistance;
+                                verticalXAngle = XAngle;
+                                verticalYAngle = YAngle;
+                                closest = verticalTargetDistance;
+                                foundVertical = true;
+                                selectedVertical = finalVertical.get(j);
+                            }
+                            if(targetSelection.getValue() == selectionSteps.farthest && tempVerticalTargetDistance > farthest){
+                                verticalTargetDistance = tempVerticalTargetDistance;
+                                verticalXAngle = XAngle;
+                                verticalYAngle = YAngle;
+                                farthest = verticalTargetDistance;
+                                foundVertical = true;
+                                selectedVertical = finalVertical.get(j);
+                            }
+                            if(distanceFormula(0.0, 0.0, Math.abs(XPos), Math.abs(YPos)) < mostCentered && targetSelection.getValue() == selectionSteps.centered){
+                                mostCentered = distanceFormula(0.0, 0.0, Math.abs(XPos), Math.abs(YPos));
+                                verticalXAngle = XAngle;
+                                verticalYAngle = YAngle;
+                                verticalTargetDistance = tempVerticalTargetDistance;
+                                foundVertical = true;
+                                selectedVertical = finalVertical.get(j);
+                            }
+                            
                         }
-                        double tilterAngle = outputTable.getNumber("Tilter angle", 0.0) * Math.PI / 180.0;
-                        verticalTargetDistance = (targetHeight.getValue() - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle)))/(Math.tan(cameraAngle.getValue()*Math.PI/180.0 + verticalYAngle*Math.PI/180.0));
+                        
                         for(int j = 0;j<finalHorizontal.size();j++){
                             
                             WPIPolygon y = finalHorizontal.get(j);
@@ -552,14 +595,17 @@ extends WPICameraExtension {
                             horizontalRectangle[j] = y;
                         }
                         
-                        if(processing.getValue() != processingSteps.showVerticalRects){
-                            rawImage.drawPolygons(verticalRectangle, wpiVerticalColorProp, width.getValue());
+                        if(processing.getValue() != processingSteps.showVerticalRects && selectedVertical != null){
+                            rawImage.drawPolygon(selectedVertical, wpiVerticalColorProp, width.getValue());
                         }
                         if(processing.getValue() != processingSteps.showHorizontalRects){
                             rawImage.drawPolygons(horizontalRectangle, wpiHorizontalColorProp, width.getValue());
                         }
                     }
                 }
+                
+                
+                
                 outputTable.putBoolean("Found horizontal target", foundHorizontal);
                 outputTable.putNumber("Horizontal target horizontal angle", horizontalXAngle);
                 outputTable.putNumber("Horizontal target vertical angle", horizontalYAngle);
