@@ -71,9 +71,11 @@ extends WPICameraExtension {
             cameraFovY          = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
             screenPercentage    = new DoubleProperty(this, "Percentage of screen sphere must cover", 1.0),
             cameraAngle         = new DoubleProperty(this, "Angle of camera relative to ground in degrees", 0.0),
-            targetHeight        = new DoubleProperty(this, "Height of target in inches", 53.5),
+            targetTop        = new DoubleProperty(this, "Height to top of target in inches", 69.5),
+            targetHeight        = new DoubleProperty(this, "Height of target in inches", 32.0),
             cameraHeight        = new DoubleProperty(this, "Height of camera in inches", 6.0),
-            leverArm        = new DoubleProperty(this, "Length of tilter from pivot point", 12.0);
+            leverArm        = new DoubleProperty(this, "Length of tilter from pivot point", 12.0),
+            tilterHeight = new DoubleProperty(this, "Height of tilter above ground when at starting position, in inches", 8.0);
     private final IntegerProperty        
             hueMinRedBall          = new IntegerProperty(this, "Hue minimum value for red ball", 125), //For picture, 1
             hueMaxRedBall          = new IntegerProperty(this, "Hue maximum value for red ball", 170), //For picture, 19
@@ -87,21 +89,21 @@ extends WPICameraExtension {
             satMaxBlueBall         = new IntegerProperty(this, "Saturation maximum value for blue ball", 255), 
             valMinBlueBall         = new IntegerProperty(this, "Value minimum value for blue ball", 10), 
             valMaxBlueBall         = new IntegerProperty(this, "Value maximum value for blue ball", 230), 
-            hueMinSquare           = new IntegerProperty(this, "Hue minimum value for rectangle", 50), //For picture: 75
-            hueMaxSquare           = new IntegerProperty(this, "Hue maximum value for rectangle", 90), //For picture: 100
-            satMinSquare           = new IntegerProperty(this, "Saturation minimum value for rectangle", 220),//for picture: 10
+            hueMinSquare           = new IntegerProperty(this, "Hue minimum value for rectangle", 10), //For picture: 75
+            hueMaxSquare           = new IntegerProperty(this, "Hue maximum value for rectangle", 150), //For picture: 100
+            satMinSquare           = new IntegerProperty(this, "Saturation minimum value for rectangle", 190),//for picture: 10
             satMaxSquare           = new IntegerProperty(this, "Saturation maximum value for rectangle", 255),//for picture: 70
-            valMinSquare           = new IntegerProperty(this, "Value minimum value for rectangle", 60),//for picture: 210
+            valMinSquare           = new IntegerProperty(this, "Value minimum value for rectangle", 190),//for picture: 210
             valMaxSquare           = new IntegerProperty(this, "Value maximum value for rectangle", 255),//for picture: 255
             closingsForBall        = new IntegerProperty(this, "Closing iterations for ball", 2),
-            closingsForTarget      = new IntegerProperty(this, "Closing iterations for target", 0),
-            width                  = new IntegerProperty(this, "Contour width", 3),
+            closingsForTarget      = new IntegerProperty(this, "Closing iterations for target", 1),
+            width                  = new IntegerProperty(this, "Contour width", 1),
             verticesCirc           = new IntegerProperty(this, "Number of ball vertices", 5),
             verticesRect           = new IntegerProperty(this, "Number of target vertices", 4);
     private final ColorProperty          
             circleColorProp       = new ColorProperty(this, "Contour color for the ball", Color.YELLOW),
             horizontalColorProp   = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
-            verticalColorProp     = new ColorProperty(this, "Contour color for the vertical target", Color.CYAN);
+            verticalColorProp     = new ColorProperty(this, "Contour color for the vertical target", Color.RED);
     //public IplConvKernel morphologyKernel;
     
     public final StringProperty saveLocation = new StringProperty(this, "Location for pictures", System.getenv("USERPROFILE") + "/Captures");
@@ -114,12 +116,12 @@ extends WPICameraExtension {
     
     private final DoubleProperty
             percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 4),
-            percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 10),
+            percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 1.8),
             
             verticalTargetRatio     = new DoubleProperty(this, "Ratio of vertical target, b:h", 0.125), //for last year's target, use 0.5
             verticalTargetMargin    = new DoubleProperty(this, "Margin for vertical ratio", .04), //for last year's target, use 0.3
-            horizontalTargetRatio   = new DoubleProperty(this, "Ratio of horizontal target, b:h", 7.4), //for last year's target, use 2.0
-            horizontalTargetMargin  = new DoubleProperty(this, "Margin for horizontal ratio", .01), //for last year's target, use 0.9
+            horizontalTargetRatio   = new DoubleProperty(this, "Ratio of horizontal target, b:h", 6.0), //for last year's target, use 2.0
+            horizontalTargetMargin  = new DoubleProperty(this, "Margin for horizontal ratio", 2.0), //for last year's target, use 0.9
             
             ballPerimeterVArea      = new DoubleProperty(this, "Value for circumference over area of ball to be less than", 1.4),
     
@@ -486,7 +488,7 @@ extends WPICameraExtension {
                             double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
                             double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
                             
-                            double aspectRatio = averageSide2/averageSide1;
+                            double aspectRatio = averageSide1/averageSide2;
                             //System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
                             if(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < verticalTargetMargin.getValue()){
                                 finalVertical.add(p);
@@ -518,11 +520,12 @@ extends WPICameraExtension {
                             }
                         }
                         
-                        WPIPolygon[] verticalRectangle = new WPIPolygon[finalVertical.size()];
                         WPIPolygon[] horizontalRectangle = new WPIPolygon[finalHorizontal.size()];
                         double mostCentered = 1.0/0.0, farthest = 0.0, closest = 1.0/0.0, tempVerticalTargetDistance;
                         double tilterAngle = outputTable.getNumber("Tilter angle", 0.0) * Math.PI / 180.0;
                         for(int j = 0; j<finalVertical.size();j++){
+                            
+                            System.out.println("Have vertical, in loop");
                             
                             WPIPolygon y = finalVertical.get(j);
                             double centerX, centerY, YPos, XPos, YAngle, XAngle;
@@ -538,14 +541,19 @@ extends WPICameraExtension {
                             
                             double distanceAngle = YAngle;
                             
+                            double height = targetTop.getValue() + targetHeight.getValue()/2;
+                            
                             if(distanceReference.getValue() == referencePoint.bottom){
                                 distanceAngle = ((2*y.getY() + y.getHeight())/rawImage.getHeight() - 1) * (FovY/2);
+                                height -= targetHeight.getValue()/2;
                             }
                             if(distanceReference.getValue() == referencePoint.top){
                                 distanceAngle = (2*y.getY()/rawImage.getHeight() - 1) * (FovY/2);
+                                height += targetHeight.getValue()/2;
                             }
                             
-                            tempVerticalTargetDistance = (targetHeight.getValue() - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle)))/(Math.tan(cameraAngle.getValue()*Math.PI/180.0 + distanceAngle*Math.PI/180.0));
+                            tempVerticalTargetDistance = (height - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle) + tilterHeight.getValue()))/(Math.tan(cameraAngle.getValue()*Math.PI/180.0 + distanceAngle*Math.PI/180.0));
+                            System.out.println(Math.atan((height - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle) + tilterHeight.getValue()))/tempVerticalTargetDistance));
                             
                             if(targetSelection.getValue() == selectionSteps.closest && tempVerticalTargetDistance <closest){
                                 verticalTargetDistance = tempVerticalTargetDistance;
@@ -571,9 +579,8 @@ extends WPICameraExtension {
                                 foundVertical = true;
                                 selectedVertical = finalVertical.get(j);
                             }
-                            
                         }
-                        
+                        //System.out.println(selectedVertical !=null);
                         for(int j = 0;j<finalHorizontal.size();j++){
                             
                             WPIPolygon y = finalHorizontal.get(j);
