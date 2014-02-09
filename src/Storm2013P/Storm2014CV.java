@@ -541,7 +541,7 @@ extends WPICameraExtension {
                             
                             double distanceAngle = YAngle;
                             
-                            double height = targetTop.getValue() + targetHeight.getValue()/2;
+                            double height = targetTop.getValue() - targetHeight.getValue()/2;
                             
                             if(distanceReference.getValue() == referencePoint.bottom){
                                 distanceAngle = ((2*y.getY() + y.getHeight())/rawImage.getHeight() - 1) * (FovY/2);
@@ -552,8 +552,8 @@ extends WPICameraExtension {
                                 height += targetHeight.getValue()/2;
                             }
                             
-                            tempVerticalTargetDistance = (height - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle) + tilterHeight.getValue()))/(Math.tan(cameraAngle.getValue()*Math.PI/180.0 + distanceAngle*Math.PI/180.0));
-                            System.out.println(Math.atan((height - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle) + tilterHeight.getValue()))/tempVerticalTargetDistance));
+                            tempVerticalTargetDistance = (height - cameraHeight.getValue())/(Math.tan(cameraAngle.getValue()*Math.PI/180.0 + distanceAngle*Math.PI/180.0));
+                            //System.out.println(Math.atan((height - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle) + tilterHeight.getValue()))/tempVerticalTargetDistance));
                             
                             if(targetSelection.getValue() == selectionSteps.closest && tempVerticalTargetDistance <closest){
                                 verticalTargetDistance = tempVerticalTargetDistance;
