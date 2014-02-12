@@ -59,7 +59,7 @@ extends WPICameraExtension {
     }
     
     public enum selectionSteps{
-        closest, farthest, biggest, centered
+        closest, farthest, centered
     }
     
     public enum referencePoint{
@@ -70,12 +70,10 @@ extends WPICameraExtension {
             cameraFovX          = new DoubleProperty(this, "Camera horizontal FOV angle", 47),
             cameraFovY          = new DoubleProperty(this, "Camera vertical FOV angle", 36.13),
             screenPercentage    = new DoubleProperty(this, "Percentage of screen sphere must cover", 1.0),
-            cameraAngle         = new DoubleProperty(this, "Angle of camera relative to ground in degrees", 0.0),
-            targetTop        = new DoubleProperty(this, "Height to top of target in inches", 69.5),
-            targetHeight        = new DoubleProperty(this, "Height of target in inches", 32.0),
-            cameraHeight        = new DoubleProperty(this, "Height of camera in inches", 6.0),
-            leverArm        = new DoubleProperty(this, "Length of tilter from pivot point", 12.0),
-            tilterHeight = new DoubleProperty(this, "Height of tilter above ground when at starting position, in inches", 8.0);
+            cameraAngle         = new DoubleProperty(this, "Angle of camera relative to ground in degrees", 13.5),
+            targetTop           = new DoubleProperty(this, "Height to top of target in inches", 69.0),
+            targetHeight        = new DoubleProperty(this, "Height of target in inches", 32.5),
+            cameraHeight        = new DoubleProperty(this, "Height of camera in inches", 13.0);
     private final IntegerProperty        
             hueMinRedBall          = new IntegerProperty(this, "Hue minimum value for red ball", 125), //For picture, 1
             hueMaxRedBall          = new IntegerProperty(this, "Hue maximum value for red ball", 170), //For picture, 19
@@ -99,7 +97,8 @@ extends WPICameraExtension {
             closingsForTarget      = new IntegerProperty(this, "Closing iterations for target", 1),
             width                  = new IntegerProperty(this, "Contour width", 1),
             verticesCirc           = new IntegerProperty(this, "Number of ball vertices", 5),
-            verticesRect           = new IntegerProperty(this, "Number of target vertices", 4);
+            verticesMinRect        = new IntegerProperty(this, "Minimum number of target vertices", 2),
+            verticesMaxRect        = new IntegerProperty(this, "Maximum number of target vertices", 4);
     private final ColorProperty          
             circleColorProp       = new ColorProperty(this, "Contour color for the ball", Color.YELLOW),
             horizontalColorProp   = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
@@ -116,7 +115,7 @@ extends WPICameraExtension {
     
     private final DoubleProperty
             percentAccCircle = new DoubleProperty(this, "Polygon approx for ball", 4),
-            percentAccRect = new DoubleProperty(this, "Polygon approx for rectangle", 1.8),
+            polyApproxRect = new DoubleProperty(this, "Polygon approx for rectangle", 1.8),
             
             verticalTargetRatio     = new DoubleProperty(this, "Ratio of vertical target, b:h", 0.125), //for last year's target, use 0.5
             verticalTargetMargin    = new DoubleProperty(this, "Margin for vertical ratio", .04), //for last year's target, use 0.3
@@ -140,8 +139,6 @@ extends WPICameraExtension {
     private double horizontalXAngle = 0.0, verticalXAngle = 0.0, horizontalYAngle = 0.0, verticalYAngle = 0.0;
     
     private long previousSaveTime = 0;
-    
-    private final boolean [] isVertical    = new boolean [4];
     
     private final ArrayList<IplImage> displayedImages = new ArrayList<>();
     
@@ -169,7 +166,7 @@ extends WPICameraExtension {
         
         ballSelection.add("Closest ball", selectionSteps.closest);
         ballSelection.add("Farthest ball", selectionSteps.farthest);
-        ballSelection.add("Largest ball", selectionSteps.biggest);
+        ballSelection.add("Ball closest to center", selectionSteps.centered);
         ballSelection.setDefault("Closest ball");
         
         targetSelection.add("Closest target", selectionSteps.closest);
@@ -180,7 +177,7 @@ extends WPICameraExtension {
         distanceReference.add("Top of target", referencePoint.top);
         distanceReference.add("Middle of target", referencePoint.middle);
         distanceReference.add("Bottom of target", referencePoint.bottom);
-        distanceReference.setDefault(referencePoint.middle);
+        distanceReference.setDefault(referencePoint.top);
         
         /*try {
             System.setOut(new PrintStream("C:\\Users\\Tim\\Downloads\\SomethingCVPrep.txt"));
@@ -193,7 +190,7 @@ extends WPICameraExtension {
     @Override
     public WPIImage processImage(WPIColorImage rawImage){
         
-        double FovX = cameraFovX.getValue(), FovY = cameraFovY.getValue(), currentCameraAngle = cameraAngle.getValue() + outputTable.getNumber("Tilter angle", 0.0);
+        double FovX = cameraFovX.getValue(), FovY = cameraFovY.getValue();
         
         long startTime = System.currentTimeMillis();
         Integer ballHueMin, ballHueMax, ballSatMin, ballSatMax, ballValMin, ballValMax;
@@ -236,7 +233,7 @@ extends WPICameraExtension {
             previousSaveTime = -1;
         }
         
-        if(outputTable.getBoolean("Blue Alliance?")){
+        if(outputTable.getBoolean("Blue Alliance?", false)){
             ballHueMin = hueMinBlueBall.getValue();
             ballHueMax = hueMaxBlueBall.getValue();
             ballSatMin = satMinBlueBall.getValue();
@@ -290,6 +287,7 @@ extends WPICameraExtension {
                 
                 size    = cvSize(rawImage.getWidth(),rawImage.getHeight());
                 hsv     = IplImage.create(size, 8, 3);
+        
                 bin     = IplImage.create(size, 8, 1);
                 hueImg  = IplImage.create(size, 8, 1);
                 satImg  = IplImage.create(size, 8, 1);
@@ -339,9 +337,9 @@ extends WPICameraExtension {
             
             if(i == 0){ //if i is 0, it looks for the ball. If it is 1, it looks for the target(s)
                 
-                WPIPolygon closest;
+                WPIPolygon tempBall;
                 
-                double largestRadius = 0.0, longestDistance = 0.0, shortestDistance = 10000.0, distanceToLargestRadius = 0.0;
+                double closestToCenter = 1.0/0.0, longestDistance = 0.0, shortestDistance = 1.0/0.0, distanceToCentered = 0.0, centerDistance;
                 boolean foundBall = false;
                 
                 if(contours.length != 0){
@@ -366,7 +364,7 @@ extends WPICameraExtension {
                         
                         //System.out.println("Have polygons");
                         
-                        closest = checkedPolygons[0];
+                        tempBall = checkedPolygons[0];
                         
                         for (WPIPolygon p : checkedPolygons) {
                             
@@ -383,28 +381,37 @@ extends WPICameraExtension {
                                 }
                             }
                             
+                            centerDistance = distanceFormula(0.0, 0.0, Math.abs((2*(tempBall.getX() + (tempBall.getWidth()/2)))/rawImage.getWidth() - 1), Math.abs((2*(tempBall.getY() + (tempBall.getHeight()/2)))/rawImage.getHeight() - 1));
+                            
                             double ballPercentInCamera = maxRadius/(double)rawImage.getWidth();
                             double distanceToBall = (ballPercentInPicture.getValue()/ballPercentInCamera) * distance.getValue();
                             
-                            if(distanceToBall < shortestDistance){
+                            if(ballSelection.getValue() == selectionSteps.closest && distanceToBall < shortestDistance){
                                 shortestDistance = distanceToBall;
-                                closest = p;
+                                tempBall = p;
+                            }
+                            if(ballSelection.getValue() == selectionSteps.farthest && distanceToBall > longestDistance){
+                                longestDistance = distanceToBall;
+                                tempBall = p;
+                            }
+                            if(ballSelection.getValue() == selectionSteps.centered && centerDistance < closestToCenter){
+                                distanceToCentered = distanceToBall;
+                                tempBall = p;
+                                closestToCenter = centerDistance;
                             }
                             
                             //System.out.println(longestDistance);
                         }
-                        WPIPolygon finalBall = closest;
-                        double distanceToBall = shortestDistance, XAngle, YAngle;
-                        /*if(selection.getValue() == selectionSteps.farthest){
-                            finalBall = farthest;
-                            distanceToBall = longestDistance;
-                        }else{
-                            if(selection.getValue() == selectionSteps.biggest){
-                                distanceToBall = distanceToLargestRadius;
-                                finalBall = largest;
-                            }
+                        WPIPolygon finalBall = tempBall;
+                        double distanceToBall = distanceToCentered, XAngle, YAngle;
+                        
+                        if(ballSelection.getValue() == selectionSteps.closest){
+                            distanceToBall = shortestDistance;
                         }
-                        */
+                        if(ballSelection.getValue() == selectionSteps.farthest){
+                            distanceToBall = longestDistance;
+                        }
+
                         XAngle = ((2*(finalBall.getX() + (finalBall.getWidth()/2)))/rawImage.getWidth() - 1) * (FovX/2);
                         YAngle = ((2*(finalBall.getY() + (finalBall.getHeight()/2)))/rawImage.getHeight() - 1) * (FovY/2);
                         
@@ -429,7 +436,7 @@ extends WPICameraExtension {
                     if(processing.getValue() == processingSteps.polygonApproxTarget){
                         WPIPolygon [] returnTargets = new WPIPolygon[contours.length];
                         for(int k = 0;k<returnTargets.length;k++){
-                            returnTargets[k] = contours[k].approxPolygon(percentAccRect.getValue());
+                            returnTargets[k] = contours[k].approxPolygon(polyApproxRect.getValue());
                         }
                         rawImage.drawPolygons(returnTargets, wpiCircleColorProp, width.getValue());
                         return rawImage;
@@ -437,7 +444,7 @@ extends WPICameraExtension {
                     
                     
                     
-                    checkedPolygons = checkPolygons(contours, verticesRect.getValue().intValue());
+                    checkedPolygons = checkPolygons(contours, verticesMinRect.getValue().intValue(), verticesMaxRect.getValue().intValue());
                     if(checkedPolygons != null && checkedPolygons.length !=0){
                         
                         if(processing.getValue() == processingSteps.checkCheckedTargetPolygons){
@@ -476,19 +483,8 @@ extends WPICameraExtension {
                         
                         for(WPIPolygon p : verticalRectangleList){
                             
-                            double [] sideLengths = new double[verticesRect.getValue().intValue()];
+                            double aspectRatio = (double)p.getWidth()/(double)p.getHeight();
                             
-                            
-                            WPIPoint [] points;
-                            points = p.getPoints();
-                            for(int j = 0;j<verticesRect.getValue().intValue();j++){
-                                sideLengths[j]=distanceFormula(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
-                            }
-
-                            double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
-                            double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
-                            
-                            double aspectRatio = averageSide1/averageSide2;
                             //System.out.println(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + verticalTargetMargin.getValue().doubleValue());
                             if(Math.abs((verticalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < verticalTargetMargin.getValue()){
                                 finalVertical.add(p);
@@ -497,21 +493,8 @@ extends WPICameraExtension {
                             }
                         }
                         for(WPIPolygon p : horizontalRectangleList){
-                            double [] sideLengths = new double[verticesRect.getValue().intValue()];
                             
-                            WPIPoint [] points;
-                            points = p.getPoints();
-                            for(int j = 0;j<verticesRect.getValue().intValue();j++){
-                                sideLengths[j]=distanceFormula(points[j].getX(), points[j].getY(), points[(j+1) % verticesRect.getValue().intValue()].getX(), points[(j+1) % verticesRect.getValue().intValue()].getY());
-                            }
-
-                            double averageSide1 = (sideLengths[0] + sideLengths[2])/2;
-                            double averageSide2 = (sideLengths[1] + sideLengths[3])/2;
-                            
-                            //System.out.println(averageSide2);
-                            
-                            double aspectRatio = averageSide2/averageSide1;
-                            //System.out.println(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) + "     " + horizontalTargetMargin.getValue().doubleValue());
+                            double aspectRatio = (double)p.getWidth()/(double)p.getHeight();
                             
                             if(Math.abs((horizontalTargetRatio.getValue().doubleValue()) - (aspectRatio)) < horizontalTargetMargin.getValue()){
                                 finalHorizontal.add(p);
@@ -522,7 +505,6 @@ extends WPICameraExtension {
                         
                         WPIPolygon[] horizontalRectangle = new WPIPolygon[finalHorizontal.size()];
                         double mostCentered = 1.0/0.0, farthest = 0.0, closest = 1.0/0.0, tempVerticalTargetDistance;
-                        double tilterAngle = outputTable.getNumber("Tilter angle", 0.0) * Math.PI / 180.0;
                         for(int j = 0; j<finalVertical.size();j++){
                             
                             System.out.println("Have vertical, in loop");
@@ -533,27 +515,32 @@ extends WPICameraExtension {
                             centerX = y.getX() + (y.getWidth()/2);
                             centerY = y.getY() + (y.getHeight()/2);
                             
-                            XPos = (2*centerX)/rawImage.getWidth() - 1;
-                            YPos = (2*centerY)/rawImage.getHeight() - 1;
+                            System.out.println("getY: " + y.getY() + "\n" + y.getHeight());
                             
+                            XPos = (2*centerX)/rawImage.getWidth() - 1;
+                            YPos = -((2*centerY)/rawImage.getHeight() - 1);
+                            System.out.println(rawImage.getHeight());
                             XAngle = XPos * (FovX/2);
                             YAngle = YPos * (FovY/2);
-                            
+                            System.out.println("Fov " + FovY);
                             double distanceAngle = YAngle;
                             
                             double height = targetTop.getValue() - targetHeight.getValue()/2;
                             
                             if(distanceReference.getValue() == referencePoint.bottom){
-                                distanceAngle = ((2*y.getY() + y.getHeight())/rawImage.getHeight() - 1) * (FovY/2);
+                                distanceAngle = -(2*(y.getY() + y.getHeight())/rawImage.getHeight() - 1) * (FovY/2);
                                 height -= targetHeight.getValue()/2;
                             }
                             if(distanceReference.getValue() == referencePoint.top){
-                                distanceAngle = (2*y.getY()/rawImage.getHeight() - 1) * (FovY/2);
+                                distanceAngle = -(2*y.getY()/rawImage.getHeight() - 1) * (FovY/2);
                                 height += targetHeight.getValue()/2;
                             }
                             
                             tempVerticalTargetDistance = (height - cameraHeight.getValue())/(Math.tan(cameraAngle.getValue()*Math.PI/180.0 + distanceAngle*Math.PI/180.0));
                             //System.out.println(Math.atan((height - (leverArm.getValue()*Math.sin(tilterAngle) + cameraHeight.getValue()*Math.cos(tilterAngle) + tilterHeight.getValue()))/tempVerticalTargetDistance));
+                            
+                            System.out.println(height + "\n" + cameraHeight.getValue() + "\n" + cameraAngle.getValue()*Math.PI/180.0 + "\n" + distanceAngle*Math.PI/180.0);
+                            
                             
                             if(targetSelection.getValue() == selectionSteps.closest && tempVerticalTargetDistance <closest){
                                 verticalTargetDistance = tempVerticalTargetDistance;
@@ -664,49 +651,29 @@ extends WPICameraExtension {
         
     }
     
-    public WPIPolygon[] checkPolygons(WPIContour[] countours, int vertices) {
+    public WPIPolygon[] checkPolygons(WPIContour[] countours, int verticesMin, int verticesMax) {
         
         //System.out.println("Got in well enough");
         ArrayList<WPIPolygon> polygons = new ArrayList<>();
-        ArrayList<WPIPolygon> rectangles = new ArrayList<>();
         WPIPolygon [] rects;
         
         ArrayList<WPIPolygon> checkedPolygons = new ArrayList<>();
                 
         for(WPIContour c:countours){
             
-            double sideRatio = ((double)c.getHeight()/(double)c.getWidth());
-            
-            polygons.add(c.approxPolygon(percentAccRect.getValue()));
+            polygons.add(c.approxPolygon(polyApproxRect.getValue()));
                 
             for(int y = 0; y < polygons.size(); y++){
                 
                 WPIPolygon p = polygons.get(y);
                 
-                WPIPoint [] points;
-                boolean orderChecks = true;
-                if(!p.isConvex() || p.getNumVertices() != vertices){
+                int vertices = p.getNumVertices();
+                
+                if(!p.isConvex() || vertices < verticesMin || vertices > verticesMax){
                     continue;
                 }
-                
-                points = p.getPoints();
-                //System.out.println(vertices);
-
-                for(int x = 0; x< vertices;x++){
-                    isVertical[x] = checkVert(points[x], points[(x+1) % vertices]);
-                }
-
-                if(!(isVertical[0] && !isVertical[1] && isVertical[2] && !isVertical[3] || !isVertical[0] && isVertical[1] && !isVertical[2] && isVertical[3])){
-                    orderChecks = false;
-                    //System.out.println("Failed side order check");
-                }else{
-                    //System.out.println("passed side order check");
-                }
-                
-                if(orderChecks){
-                    checkedPolygons.add(p);
-                }
             
+                checkedPolygons.add(p);
             
             }
             
@@ -727,15 +694,8 @@ extends WPICameraExtension {
     }
     
     public boolean isVert(WPIPolygon p){
-        WPIPoint[] points = p.getPoints();
-        double averageSide0 = ((distanceFormula(points[0].getX(), points[0].getY(), points[1].getX(), points[1].getY())) + (distanceFormula(points[2].getX(), points[2].getY(), points[3].getX(), points[3].getY())))/2;
-        double averageSide1 = ((distanceFormula(points[1].getX(), points[1].getY(), points[2].getX(), points[2].getY())) + (distanceFormula(points[3].getX(), points[3].getY(), points[0].getX(), points[0].getY())))/2;
         double aspectRatio;
-        if(checkVert(points[0], points[1])){
-            aspectRatio = averageSide1/averageSide0;    
-        }else{
-            aspectRatio = averageSide0/averageSide1;
-        }
+        aspectRatio = p.getWidth()/p.getHeight();
         return aspectRatio <= 1;
     }
     
