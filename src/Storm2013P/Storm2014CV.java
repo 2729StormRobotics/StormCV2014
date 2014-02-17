@@ -52,8 +52,6 @@ extends WPICameraExtension {
     public MultiProperty targetSelection = new MultiProperty(this, "Select which target?");
     public MultiProperty distanceReference = new MultiProperty(this, "Where on target to base reference point");
     
-    
-    
     public enum processingSteps{
         doNothing, thresholdBall, thresholdTarget, contoursBall, contoursTarget, polygonApproxBall, polygonApproxTarget, checkCheckedPolygons, showVerticalRects, showHorizontalRects, everything, checkCheckedTargetPolygons
     }
@@ -140,8 +138,6 @@ extends WPICameraExtension {
     
     private long previousSaveTime = 0;
     
-    private final ArrayList<IplImage> displayedImages = new ArrayList<>();
-    
     private static final ITable outputTable = Robot.getTable();
     
     private double imageWidth, imageHeight;
@@ -198,7 +194,13 @@ extends WPICameraExtension {
         if(outputTable.getBoolean("Enabled", false)){
             long currentTime = System.currentTimeMillis();
             if(!imageTest.getValue() && savePeriod.getValue() >= 0  && (previousSaveTime <0 || previousSaveTime + savePeriod.getValue() <= currentTime)){
+                /**
+                 * This makes sure the robot runs in a decent amount of time
+                 */
                 previousSaveTime = currentTime;
+                /**
+                 * This is used to take screenshots from the camera while the robot is running, allowing for better debugging and an easier time thresholding
+                 */
                 final IplImage picture = StormExtensions.getIplImage(rawImage);
                 new Thread(){
                     private final String fileName = "/Capture " + new SimpleDateFormat("yyyy-MM-dd HH.mm.ss").format(new Date()) + ".jpg";
@@ -249,6 +251,10 @@ extends WPICameraExtension {
             ballValMax = valMaxRedBall.getValue();
         }
         
+        /**
+         * This allows us to test vision system with a test picture, instead of a live camera feed
+         */
+        
         if(imageTest.getValue()){
             try {
                 testImage = new WPIColorImage(ImageIO.read(new File("test.jpg")));
@@ -274,6 +280,10 @@ extends WPICameraExtension {
             WPIColor wpiHorizontalColorProp = new WPIColor(horizontalColorProp.getValue());
             WPIColor wpiVerticalColorProp = new WPIColor(verticalColorProp.getValue());
             IplImage thresholdIPL;
+            
+            /**
+             * Deallocate then reallocate if the size has changed, or if it is the first time through the loop. Deallocation is done to keep IPLImages from clogging the memory
+             */
             
             if(size == null || size.width() != rawImage.getWidth() || size.height() != rawImage.getHeight()) {
                 if(hsv != null){
@@ -670,6 +680,7 @@ extends WPICameraExtension {
                 int vertices = p.getNumVertices();
                 
                 if(!p.isConvex() || vertices < verticesMin || vertices > verticesMax){
+                    System.out.println(vertices);
                     continue;
                 }
             
@@ -780,7 +791,6 @@ extends WPICameraExtension {
     public void displayImage(String title,IplImage image) {
          IplImage newImage = IplImage.create(image.cvSize(), image.depth(), image.nChannels());
          cvCopy(image, newImage);
-         displayedImages.add(newImage);
          CanvasFrame resultFrame = new CanvasFrame(title);
          resultFrame.showImage(newImage.getBufferedImage());
          newImage.deallocate();
