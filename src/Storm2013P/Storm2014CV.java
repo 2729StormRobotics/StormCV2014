@@ -94,11 +94,19 @@ extends WPICameraExtension {
             width                  = new IntegerProperty(this, "Contour width", 1),
             verticesCirc           = new IntegerProperty(this, "Number of ball vertices", 5),
             verticesMinRect        = new IntegerProperty(this, "Minimum number of target vertices", 2),
-            verticesMaxRect        = new IntegerProperty(this, "Maximum number of target vertices", 4);
+            verticesMaxRect        = new IntegerProperty(this, "Maximum number of target vertices", 4),
+            aimingLineThickness    = new IntegerProperty(this, "Thickness for aiming lines", 3),
+            lineTopHeight          = new IntegerProperty(this, "Height of top line", 20),
+            lineMiddleHeight       = new IntegerProperty(this, "Height of middle line", 80),
+            lineBottomHeight       = new IntegerProperty(this, "Height of bottom line", 140);
+            
     private final ColorProperty          
-            circleColorProp       = new ColorProperty(this, "Contour color for the ball", Color.YELLOW),
-            horizontalColorProp   = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
-            verticalColorProp     = new ColorProperty(this, "Contour color for the vertical target", Color.RED);
+            circleColorProp          = new ColorProperty(this, "Contour color for the ball", Color.YELLOW),
+            horizontalColorProp      = new ColorProperty(this, "Contour color for the horizontal target", Color.MAGENTA),
+            verticalColorProp        = new ColorProperty(this, "Contour color for the vertical target", Color.RED),
+            lineTopColorProp         = new ColorProperty(this, "Color for high cross aiming line", Color.orange),
+            lineMiddleColorProp      = new ColorProperty(this, "Color for middling cross aiming line", Color.BLUE),
+            lineBottomColorProp      = new ColorProperty(this, "Color for low cross aiming line", Color.GREEN);
     //public IplConvKernel morphologyKernel;
     
     public final StringProperty saveLocation = new StringProperty(this, "Location for pictures", System.getenv("USERPROFILE") + "/Captures");
@@ -332,6 +340,19 @@ extends WPICameraExtension {
             }
             
             contours = StormExtensions.findConvexContours(thresholds);
+            
+            cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineTopHeight.getValue()), 
+                    new CvPoint(rawImage.getWidth(), (int) lineTopHeight.getValue()), 
+                    CV_RGB(lineTopColorProp.getValue().getRed(), lineTopColorProp.getValue().getGreen(), lineTopColorProp.getValue().getBlue()), 
+                    (int) aimingLineThickness.getValue(), 8, 0);
+            cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineMiddleHeight.getValue()), 
+                    new CvPoint(rawImage.getWidth(), (int) lineMiddleHeight.getValue()), 
+                    CV_RGB(lineMiddleColorProp.getValue().getRed(), lineMiddleColorProp.getValue().getGreen(), lineMiddleColorProp.getValue().getBlue()), 
+                    (int) aimingLineThickness.getValue(), 8, 0);
+            cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineBottomHeight.getValue()), 
+                    new CvPoint(rawImage.getWidth(), (int) lineBottomHeight.getValue()), 
+                    CV_RGB(lineBottomColorProp.getValue().getRed(), lineBottomColorProp.getValue().getGreen(), lineBottomColorProp.getValue().getBlue()), 
+                    (int) aimingLineThickness.getValue(), 8, 0);
             
             if(processing.getValue() == processingSteps.contoursBall && i == 0){
                 rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());
