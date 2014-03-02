@@ -226,7 +226,7 @@ extends WPICameraExtension {
                             folderFile.mkdirs();
                             File out = new File(saveLocation.getValue() + fileName);
                             ImageIO.write(copy.getBufferedImage(), "jpg", out);
-                            System.out.println("Saved \"" + fileName + "\"");
+                            System.out.println("Savefd \"" + fileName + "\"");
                         }catch(Exception ex){
                             Logger.getLogger(Storm2014CV.class.getName()).log(Level.SEVERE, "Save of \"" + fileName + "\" failed");
                             ex.printStackTrace();
@@ -340,20 +340,7 @@ extends WPICameraExtension {
             }
             
             contours = StormExtensions.findConvexContours(thresholds);
-            
-            cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineTopHeight.getValue()), 
-                    new CvPoint(rawImage.getWidth(), (int) lineTopHeight.getValue()), 
-                    CV_RGB(lineTopColorProp.getValue().getRed(), lineTopColorProp.getValue().getGreen(), lineTopColorProp.getValue().getBlue()), 
-                    (int) aimingLineThickness.getValue(), 8, 0);
-            cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineMiddleHeight.getValue()), 
-                    new CvPoint(rawImage.getWidth(), (int) lineMiddleHeight.getValue()), 
-                    CV_RGB(lineMiddleColorProp.getValue().getRed(), lineMiddleColorProp.getValue().getGreen(), lineMiddleColorProp.getValue().getBlue()), 
-                    (int) aimingLineThickness.getValue(), 8, 0);
-            cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineBottomHeight.getValue()), 
-                    new CvPoint(rawImage.getWidth(), (int) lineBottomHeight.getValue()), 
-                    CV_RGB(lineBottomColorProp.getValue().getRed(), lineBottomColorProp.getValue().getGreen(), lineBottomColorProp.getValue().getBlue()), 
-                    (int) aimingLineThickness.getValue(), 8, 0);
-            
+             
             if(processing.getValue() == processingSteps.contoursBall && i == 0){
                 rawImage.drawContours(contours, wpiCircleColorProp, width.getValue());
                 return rawImage;
@@ -446,14 +433,11 @@ extends WPICameraExtension {
                         
                         foundBall = true;
                         
-                        outputTable.putNumber("Ball horizontal angle to center", XAngle);
-                        outputTable.putNumber("Ball vertical angle to center", YAngle);
-                        outputTable.putNumber("Distance to ball in inches", distanceToBall);
                         rawImage.drawPolygon(finalBall, wpiCircleColorProp, width.getValue());
                         
                     }
                 }
-                outputTable.putBoolean("Found ball", foundBall);
+                
             }else{
                 
                 boolean foundHorizontal = false, foundVertical = false;
@@ -635,9 +619,9 @@ extends WPICameraExtension {
                 outputTable.putBoolean("Found vertical target", foundVertical);
                 outputTable.putNumber("Vertical target horizontal angle", verticalXAngle);
                 outputTable.putNumber("Vertical target vertical angle", verticalYAngle);
-                outputTable.putNumber("Distance to wall in inches", verticalTargetDistance);
             }
         }
+        
         long endTime = System.currentTimeMillis();
         outputTable.putNumber("Time taken in milliseconds", endTime - startTime);
         return rawImage;
