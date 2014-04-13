@@ -1,4 +1,4 @@
-package Storm2013P; 
+package Storm2014CV; 
 import com.googlecode.javacv.CanvasFrame;
 import static com.googlecode.javacv.cpp.opencv_core.*;
 import static com.googlecode.javacv.cpp.opencv_imgproc.*;
@@ -226,7 +226,7 @@ extends WPICameraExtension {
                             folderFile.mkdirs();
                             File out = new File(saveLocation.getValue() + fileName);
                             ImageIO.write(copy.getBufferedImage(), "jpg", out);
-                            System.out.println("Savefd \"" + fileName + "\"");
+                            System.out.println("Saved \"" + fileName + "\"");
                         }catch(Exception ex){
                             Logger.getLogger(Storm2014CV.class.getName()).log(Level.SEVERE, "Save of \"" + fileName + "\" failed");
                             ex.printStackTrace();
@@ -437,7 +437,7 @@ extends WPICameraExtension {
                         
                     }
                 }
-                
+                //outputTable.putBoolean("Found ball", foundBall);
             }else{
                 
                 boolean foundHorizontal = false, foundVertical = false;
@@ -621,6 +621,19 @@ extends WPICameraExtension {
                 outputTable.putNumber("Vertical target vertical angle", verticalYAngle);
             }
         }
+        
+        cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineTopHeight.getValue()), 
+            new CvPoint(rawImage.getWidth(), (int) lineTopHeight.getValue()), 
+            CV_RGB(lineTopColorProp.getValue().getRed(), lineTopColorProp.getValue().getGreen(), lineTopColorProp.getValue().getBlue()), 
+            (int) aimingLineThickness.getValue(), 8, 0);
+        cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineMiddleHeight.getValue()), 
+            new CvPoint(rawImage.getWidth(), (int) lineMiddleHeight.getValue()), 
+            CV_RGB(lineMiddleColorProp.getValue().getRed(), lineMiddleColorProp.getValue().getGreen(), lineMiddleColorProp.getValue().getBlue()), 
+            (int) aimingLineThickness.getValue(), 8, 0);
+        cvLine(StormExtensions.getIplImage(rawImage), new CvPoint(0, (int) lineBottomHeight.getValue()), 
+            new CvPoint(rawImage.getWidth(), (int) lineBottomHeight.getValue()), 
+            CV_RGB(lineBottomColorProp.getValue().getRed(), lineBottomColorProp.getValue().getGreen(), lineBottomColorProp.getValue().getBlue()), 
+            (int) aimingLineThickness.getValue(), 8, 0);
         
         long endTime = System.currentTimeMillis();
         outputTable.putNumber("Time taken in milliseconds", endTime - startTime);
